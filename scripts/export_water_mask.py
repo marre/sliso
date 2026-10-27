@@ -37,6 +37,8 @@ def export(source, destination, ocean=None, tile_degrees=0.25):
         if bounds is None:continue
         west,south,east,north=bounds
         if not all(math.isfinite(v) for v in bounds) or west < -180 or east > 180 or south < -90 or north > 90:raise ValueError('Invalid water coordinates')
+        cells=(math.floor(east/tile_degrees)-math.floor(west/tile_degrees)+1)*(math.floor(north/tile_degrees)-math.floor(south/tile_degrees)+1)
+        if cells>10000:raise ValueError('Water polygon spans too many tiles; clip input to the service region first')
         for x in range(math.floor(west/tile_degrees),math.floor(east/tile_degrees)+1):
             for y in range(math.floor(south/tile_degrees),math.floor(north/tile_degrees)+1):
                 tiles.setdefault((x,y),[]).append(geometry)
