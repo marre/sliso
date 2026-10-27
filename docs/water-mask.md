@@ -41,3 +41,31 @@ If a tile fails, the overlay remains visible rather than disappearing.
 The repo does not yet bundle the regional OSM water/ocean export. The
 implementation is inactive unless the environment variable and files are
 provided.
+
+## Automated source preparation (new)
+
+A manual GitHub Actions workflow, `.github/workflows/water-mask.yml`,
+fetches the checksum-pinned OSM extract already used by the walking build,
+filters water ways/relations with Osmium, converts and clips inland polygons
+using GDAL, and downloads the WGS84 split ocean polygons from OSMCoastline.
+It clips each polygon into bounded 0.25-degree tiles using Shapely, validates
+tile sizes, and uploads a seven-day `sliso-water-tiles` artifact.
+
+For local execution on a machine with `osmium`, `ogr2ogr`, `curl` and
+Python `shapely>=2,<3` installed:
+
+```sh
+python scripts/prepare_water_mask.py --output public/water-tiles \
+  --bounds 17.2 58.7 19.8 60.4
+```
+
+The bounding box is a configurable **initial Stockholm-region estimate**,
+not a guaranteed complete SL service boundary. Verify it against stop and
+walking-contour extents before deployment. The ocean ZIP is a mutable external
+source; for fully reproducible releases, record its SHA-256 and archive
+snapshot before publication.
+
+The workflow is deliberately opt-in and publishes an artifact, **not a
+production deployment**. To activate a preview, copy the validated artifact
+to `public/water-tiles`, set `VITE_WATER_TILES_URL=/water-tiles` in the
+Cloudflare build environment, and rebuild. Water masking is otherwise off.
