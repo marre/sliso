@@ -51,7 +51,6 @@ def fetch_latest_osm(url, cache, *, timeout=1800):
     Resolve the current dated snapshot via the MD5 sidecar redirect so a
     publication during download cannot mix checksums and file versions.
     """
-    from urllib.parse import urljoin
     from urllib.request import urlopen
     import re
 
@@ -61,7 +60,7 @@ def fetch_latest_osm(url, cache, *, timeout=1800):
     with urlopen(url+'.md5',timeout=120) as response:
         sidecar_url=response.geturl()
         sidecar=response.read(1024).decode('ascii')
-    match=re.match(r'^([0-9a-fA-F]{32})(?:\\s|$)',sidecar)
+    match=re.match(r'^([0-9a-fA-F]{32})(?:\s|$)',sidecar)
     if not match:raise ValueError('Invalid Geofabrik MD5 sidecar')
     checksum=match.group(1).lower()
     # The resolved dated sidecar URL identifies the immutable snapshot.
