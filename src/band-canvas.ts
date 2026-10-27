@@ -10,7 +10,7 @@ export class BandCanvas {
     if(!this.map.getSource('walking-areas')){
       const b=this.area;
       this.map.addSource('walking-areas',{type:'canvas',canvas:this.canvas,animate:false,coordinates:[b.getNorthWest().toArray(),b.getNorthEast().toArray(),b.getSouthEast().toArray(),b.getSouthWest().toArray()]});
-      this.map.addLayer({id:'walking-areas',type:'raster',source:'walking-areas',paint:{'raster-opacity':.48,'raster-resampling':'nearest','raster-fade-duration':0}},this.map.getLayer('stops')?'stops':undefined);
+      this.map.addLayer({id:'walking-areas',type:'raster',source:'walking-areas',paint:{'raster-opacity':.48,'raster-resampling':'linear','raster-fade-duration':0}},this.map.getLayer('stops')?'stops':undefined);
     }
     const source=this.map.getSource('walking-areas') as CanvasSource;
     source.play();this.map.triggerRepaint();this.map.once('render',()=>{if(this.map.getSource('walking-areas')===source)source.pause();});
