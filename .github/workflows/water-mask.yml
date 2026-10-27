@@ -41,13 +41,25 @@ jobs:
         with:
           path: .data-build/water-cache
           key: sliso-water-sources-v1
+      - name: Resolve shared walking OSM source
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          sys.path.insert(0,'scripts')
+          from prepare_walking import fetch_osm
+          provenance=json.loads(Path('data/walking-index.source.json').read_text())['osm']
+          pbf=fetch_osm(provenance,Path('.data-build/water-cache/osm'))
+          Path('.data-build/water-source-path').write_text(str(pbf))
+          PY
       - name: Build clipped water tiles
         env:
           WEST: ${{ inputs.west }}
           SOUTH: ${{ inputs.south }}
           EAST: ${{ inputs.east }}
           NORTH: ${{ inputs.north }}
-        run: python scripts/prepare_water_mask.py --output public/water-tiles --bounds "$WEST" "$SOUTH" "$EAST" "$NORTH"
+        run: python scripts/prepare_water_mask.py --pbf "$(cat .data-build/water-source-path)" --output public/water-tiles --bounds "$WEST" "$SOUTH" "$EAST" "$NORTH"
       - name: Verify tile size and manifest
         run: |
           python - <<'PY'
