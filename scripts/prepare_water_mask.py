@@ -41,6 +41,7 @@ def build(output,cache,bounds,ocean_archive=None,pbf=None):
         archive='/vsizip/'+str(Path(ocean_archive).resolve())
         run('ogr2ogr','-f','GeoJSON',ocean,archive,'-spat',west,south,east,north,'-clipsrc',west,south,east,north,'-nlt','PROMOTE_TO_MULTI')
         run(sys.executable,'scripts/export_water_mask.py','--geojson',inland,'--ocean-geojson',ocean,'--output',output)
+        run(sys.executable,'scripts/water_bitmap.py','--source',output,'--output',Path(output).parent/'water-bitmap')
         print('Water tiles prepared. Set VITE_WATER_TILES_URL=/water-tiles when deploying.',flush=True)
 
 if __name__=='__main__':
