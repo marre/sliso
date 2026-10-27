@@ -11,18 +11,17 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Water extraction uses an independently dated snapshot: the walking index's
-# historical PBF can disappear from Geofabrik while its provenance stays pinned.
-WATER_PBF_URL='https://download.geofabrik.de/europe/sweden-261020.osm.pbf'
+# The walking index remains pinned separately; the water pipeline tracks current OSM.
+WATER_PBF_URL='https://download.geofabrik.de/europe/sweden-latest.osm.pbf'
 OCEAN_URL='https://osmdata.openstreetmap.de/download/water-polygons-split-4326.zip'
 
 def run(*args):
     subprocess.run([str(a) for a in args],check=True)
 
 def fetch_water_osm(cache):
-    """Download a dated Geofabrik extract and verify it against its MD5 sidecar.
+    """Download Geofabrik's current extract and verify it against its MD5 sidecar.
 
-    Keep walking-index provenance untouched; this snapshot is only for water tiles.
+    Cache by checksum to avoid treating a changing latest URL as immutable.
     """
     cache=Path(cache)
     cache.mkdir(parents=True,exist_ok=True)
@@ -34,7 +33,7 @@ def fetch_water_osm(cache):
     checksum=checksum_file.read_text().split()[0].lower()
     if len(checksum)!=32 or any(c not in '0123456789abcdef' for c in checksum):
         raise ValueError('Invalid Geofabrik MD5 sidecar')
-    target=cache/filename
+    target=cache/(checksum+'.osm.pbf')
     def matches(path):
         if not path.exists():return False
         with path.open('rb') as stream:
@@ -43,19 +42,19 @@ def fetch_water_osm(cache):
         print('Reusing verified water OSM snapshot:',filename,flush=True)
         return target
     target.unlink(missing_ok=True)
-    part=cache/(filename+'.part')
+    part=cache/(checksum+'.part')
     for attempt in range(3):
         print(f'Downloading water OSM snapshot {filename}, attempt {attempt+1}/3',flush=True)
         result=subprocess.run(['curl','--fail','--location','--show-error',
             '--connect-timeout','30','--max-time','1800','--continue-at','-',
             '--output',str(part),WATER_PBF_URL],check=False)
-        if result.returncode==0 and matches(part):
+        if matches(part):
             part.replace(target)
             print('Verified Geofabrik snapshot:',filename,flush=True)
             return target
         if result.returncode==0:
             part.unlink(missing_ok=True)
-            raise ValueError('Water OSM checksum mismatch')
+            raise ValueError('Water OSM checksum mismatch (latest may have changed during transfer)')
         if result.returncode==33:part.unlink(missing_ok=True)
     raise RuntimeError('Failed to download verified water OSM snapshot')
 
