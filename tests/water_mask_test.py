@@ -5,9 +5,14 @@ import unittest
 from pathlib import Path
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
+try:
+    import shapely
+except ImportError:
+    shapely=None
 from export_water_mask import export
 
 class WaterMaskTests(unittest.TestCase):
+    @unittest.skipUnless(shapely is not None,'shapely optional in standard CI')
     def test_polygon_is_clipped_to_tiles_and_holes_preserved(self):
         outer=[[0,0],[0.4,0],[0.4,0.4],[0,0.4],[0,0]]
         hole=[[0.1,0.1],[0.1,0.2],[0.2,0.2],[0.2,0.1],[0.1,0.1]]
