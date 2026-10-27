@@ -55,8 +55,8 @@ For local execution on a machine with `osmium`, `ogr2ogr`, `curl` and
 Python `shapely>=2,<3` installed:
 
 ```sh
-python scripts/prepare_water_mask.py --output public/water-tiles \
-  --bounds 17.2 58.7 19.8 60.4
+python scripts/prepare_water_mask.py --pbf .data-build/osm-cache/VERIFIED.osm.pbf \
+  --output public/water-tiles --bounds 17.2 58.7 19.8 60.4
 ```
 
 The bounding box is a configurable **initial Stockholm-region estimate**,
@@ -69,3 +69,22 @@ The workflow is deliberately opt-in and publishes an artifact, **not a
 production deployment**. To activate a preview, copy the validated artifact
 to `public/water-tiles`, set `VITE_WATER_TILES_URL=/water-tiles` in the
 Cloudflare build environment, and rebuild. Water masking is otherwise off.
+
+## Shared walking-data build (PR #6)
+
+The preferred build path is `.github/workflows/data.yml` with `prepare_walking=true`,
+`prepare_water=true`, and `inventory_only=false`. The walking source is resolved
+and SHA-256 verified once by `prepare_walking.py`; the same local PBF is passed
+to `prepare_water_mask.py`. The resulting `sliso-water-tiles` artifact is
+**not automatically deployed**. It still needs coastline and island review,
+and the browser currently reads optional water tiles rather than an embedded
+walking-data mask.
+
+The walking provenance currently identifies a dated OSM extract which may no
+longer be available upstream. Until source rotation is implemented with a new
+checksum and recorded provenance, a fresh CI rebuild may fail. Never silently
+substitute `latest` bytes for the pinned walking-source SHA-256.
+
+Manual `prepare_water_mask.py` calls must now specify `--pbf` pointing to the
+verified walking source. The standalone water workflow uses the same pinned
+source resolver but is intended only for troubleshooting.
