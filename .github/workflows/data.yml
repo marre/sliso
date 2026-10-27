@@ -94,6 +94,7 @@ jobs:
       - name: Rebuild optional walking distances and network areas
         if: github.event_name == 'workflow_dispatch' && inputs.prepare_walking && !inputs.inventory_only
         run: |
+          rm -rf .data-build/prepared-walking
           python -m venv /tmp/sliso-walking-venv
           /tmp/sliso-walking-venv/bin/pip install -r scripts/requirements-walking.txt
           walking_args=(--current-osm)
@@ -150,10 +151,10 @@ jobs:
             echo '::error::Footpath cache missing. Rebuild with prepare_walking=true; refusing to drop map origins.'
             exit 1
           fi
-          if test -f .data-build/prepared-walking/osm-source.json; then
+          if test "${{ inputs.prepare_walking }}" = 'true' && test -f .data-build/prepared-walking/osm-source.json; then
             area_args+=(--osm-source .data-build/prepared-walking/osm-source.json)
           fi
-          if test -f .data-build/prepared-walking/water-bitmap/index.json; then
+          if test "${{ inputs.prepare_walking }}" = 'true' && test "${{ inputs.prepare_water }}" = 'true' && test -f .data-build/prepared-walking/water-bitmap/index.json; then
             area_args+=(--water-mask .data-build/prepared-walking/water-bitmap)
           fi
           python scripts/build_data.py --gtfs .data-build/sl.zip --walks .data-build/walks.json --scope data/feed-scope.json --output .data-build/published "${area_args[@]}"
