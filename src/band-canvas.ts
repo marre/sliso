@@ -1,11 +1,12 @@
 import {WaterMask} from './water-mask';
+import type {Manifest} from './core/types';
 import {LngLatBounds,type Map as GLMap,type CanvasSource} from 'maplibre-gl';
 export class BandCanvas {
   readonly canvas=document.createElement('canvas');
   coverage?:LngLatBounds;
-  private readonly waterMask=new WaterMask();
+  private readonly waterMask:WaterMask;
   private revision=0;
-  constructor(private map:GLMap,private area:LngLatBounds){this.canvas.className='walking-raster';this.canvas.hidden=true;map.getContainer().append(this.canvas);}
+  constructor(private map:GLMap,private area:LngLatBounds,water?:Manifest['waterMask']){this.waterMask=new WaterMask(water);this.canvas.className='walking-raster';this.canvas.hidden=true;map.getContainer().append(this.canvas);}
   remove(){this.revision++;if(this.map.getLayer('walking-areas'))this.map.removeLayer('walking-areas');if(this.map.getSource('walking-areas'))this.map.removeSource('walking-areas');this.canvas.remove();}
   async image(width:number,height:number,pixels:Uint8ClampedArray,cutoff:number){
     const revision=++this.revision;
