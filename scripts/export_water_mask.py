@@ -28,25 +28,33 @@ def bbox(geometry):
 def export(source, destination, ocean=None, tile_degrees=0.25):
     if not 0.01<=tile_degrees<=2:raise ValueError('tile-degrees must be 0.01..2')
     out=Path(destination);out.mkdir(parents=True,exist_ok=True)
+    from shapely.geometry import shape, mapping, box
     tiles={}
     geometries=list(polygons(source,True))
     if ocean:geometries+=list(polygons(ocean,False))
     if not geometries:raise ValueError('No polygon water features found; refusing empty mask')
     for geometry in geometries:
-        bounds=bbox(geometry)
-        if bounds is None:continue
-        west,south,east,north=bounds
+        original=shape(geometry)
+        if original.is_empty:continue
+        if not original.is_valid:original=original.buffer(0)
+        if original.is_empty:continue
+        west,south,east,north=original.bounds
         if not all(math.isfinite(v) for v in bounds) or west < -180 or east > 180 or south < -90 or north > 90:raise ValueError('Invalid water coordinates')
         cells=(math.floor(east/tile_degrees)-math.floor(west/tile_degrees)+1)*(math.floor(north/tile_degrees)-math.floor(south/tile_degrees)+1)
         if cells>10000:raise ValueError('Water polygon spans too many tiles; clip input to the service region first')
         for x in range(math.floor(west/tile_degrees),math.floor(east/tile_degrees)+1):
             for y in range(math.floor(south/tile_degrees),math.floor(north/tile_degrees)+1):
-                tiles.setdefault((x,y),[]).append(geometry)
+                clipped=original.intersection(box(x*tile_degrees,y*tile_degrees,(x+1)*tile_degrees,(y+1)*tile_degrees))
+                if clipped.is_empty:continue
+                parts=[clipped] if clipped.geom_type in ('Polygon','MultiPolygon') else [g for g in getattr(clipped,'geoms',[]) if g.geom_type in ('Polygon','MultiPolygon')]
+                for part in parts:
+                    if part.area>0:tiles.setdefault((x,y),[]).append(mapping(part))
     index={}
     for (x,y),shapes in sorted(tiles.items()):
         name=f'{x}_{y}.json'
         (out/name).write_text(json.dumps({'type':'FeatureCollection','features':[{'type':'Feature','geometry':g,'properties':{}} for g in shapes]},separators=(',',':')))
         index[f'{x},{y}']=name
+    if not tiles:raise ValueError('No water polygons intersect output tiles')
     (out/'index.json').write_text(json.dumps({'schema':1,'tileDegrees':tile_degrees,'tiles':index},sort_keys=True,separators=(',',':')))
     print(f'Exported {len(geometries)} polygons to {len(tiles)} tiles in {out}')
 
