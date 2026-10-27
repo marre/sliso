@@ -6,6 +6,10 @@ on:
         description: Rebuild conservative OSM walking distances and one-minute area contours (optional, slower)
         type: boolean
         default: false
+      prepare_water:
+        description: Build water-mask tiles from the same OSM extract (requires prepare_walking)
+        type: boolean
+        default: false
       publish_release:
         description: Publish compiled data to a GitHub Release and update the Cloudflare build pointer
         type: boolean
@@ -77,12 +81,35 @@ jobs:
           name: sliso-gtfs-inventory
           path: .data-build/inventory/
           retention-days: 7
+      - name: Require walking rebuild when water generation is requested
+        if: github.event_name == 'workflow_dispatch' && inputs.prepare_water && (!inputs.prepare_walking || inputs.inventory_only)
+        run: |
+          echo '::error::prepare_water requires prepare_walking=true and inventory_only=false'
+          exit 1
+      - name: Install water extraction tools
+        if: github.event_name == 'workflow_dispatch' && inputs.prepare_water
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y osmium-tool gdal-bin
       - name: Rebuild optional walking distances and network areas
         if: github.event_name == 'workflow_dispatch' && inputs.prepare_walking && !inputs.inventory_only
         run: |
           python -m venv /tmp/sliso-walking-venv
           /tmp/sliso-walking-venv/bin/pip install -r scripts/requirements-walking.txt
-          /tmp/sliso-walking-venv/bin/python scripts/prepare_walking.py --gtfs .data-build/sl.zip --output .data-build/prepared-walking
+          walking_args=()
+          if test "${{ inputs.prepare_water }}" = 'true'; then
+            /tmp/sliso-walking-venv/bin/pip install 'shapely>=2,<3'
+            walking_args=(--water-output .data-build/prepared-walking/water-tiles)
+          fi
+          /tmp/sliso-walking-venv/bin/python scripts/prepare_walking.py --gtfs .data-build/sl.zip --output .data-build/prepared-walking "${walking_args[@]}"
+      - name: Save generated water tiles for validation
+        if: github.event_name == 'workflow_dispatch' && inputs.prepare_water
+        uses: actions/upload-artifact@v4
+        with:
+          name: sliso-water-tiles
+          path: .data-build/prepared-walking/water-tiles/
+          if-no-files-found: error
+          retention-days: 7
       - name: Save walking coverage and detour audit
         if: always() && (github.event_name != 'workflow_dispatch' || !inputs.inventory_only)
         uses: actions/upload-artifact@v4
