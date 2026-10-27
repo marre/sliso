@@ -27,6 +27,7 @@ export interface Manifest {
   walkingMaxMinutes: number; walkingVersion: string; walkingSpeedKmh: number;
   transferWalking?: {policy:string;eligibleRows:number;addedLinks:number;existingComponent:number;rejectedCost:number};
   walkingCoverage?: { totalStops: number; boundStops: number; pairs: number; reviewed: boolean };
+  waterMask?: {format:'sliso-water-bitmap-v1';tileDegrees:number;resolution:number;tiles:Record<string,FileRef>};
   walkingAreas?: ContourFiles & { stepMinutes: 1; sources?: Record<string, number>; overview?: ContourFiles & {stepMinutes:5}; reviewed: boolean };
   stops: FileRef; walks: FileRef; routes: FileRef; transfers: FileRef;
   footpaths?: {format:'sliso-footpaths-v1';tileDegrees:number;sourceVersion:string;index:Record<string,FileRef>};
