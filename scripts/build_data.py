@@ -114,7 +114,7 @@ def compact_walks(walks):
     return {'schema':1,'sources':sources,'edges':[[w['from'],w['to'],w['seconds'],w.get('metres'),ids[w['source']]] for w in walks]}
 
 
-def publish(output, stops, routes, walks, transfers, trips, days, meta, report, areas=None):
+def publish(output, stops, routes, walks, transfers, trips, days, meta, report, areas=None, water=None):
     if areas:
         from contour_bundles import bundle
         areas = bundle(areas, stops)
@@ -145,7 +145,8 @@ def publish(output, stops, routes, walks, transfers, trips, days, meta, report, 
             report['walkingClosure'] = dict(pairs=pairs, bytes=len(files['walking-closure.bin']), witnessesVerified=True)
         files.update(time_files)
         if areas: files.update(areas['files'])
-        fingerprint = hashlib.sha256(compact(meta) + (compact({k:v for k,v in areas.items() if k != 'files'}) if areas else b'') + b''.join(files[n] for n in sorted(files))).hexdigest()[:20]
+        if water: files.update(water['files'])
+        fingerprint = hashlib.sha256(compact(meta) + (compact({k:v for k,v in areas.items() if k != 'files'}) if areas else b'') + (compact({k:v for k,v in water.items() if k != 'files'}) if water else b'') + b''.join(files[n] for n in sorted(files))).hexdigest()[:20]
         version = ('demo-' if meta['demo'] else 'sl-') + fingerprint
         refs = {}
         for name, raw in files.items():
@@ -166,6 +167,8 @@ def publish(output, stops, routes, walks, transfers, trips, days, meta, report, 
         if areas:
             from contour_bundles import manifest_fields
             manifest['walkingAreas'] = manifest_fields(areas, refs)
+        if water:
+            manifest['waterMask'] = dict(format='sliso-water-bitmap-v1',tileDegrees=water['tileDegrees'],resolution=water['resolution'],tiles={key:refs[name] for key,name in water['tiles'].items()})
         pending = output / '.manifest.tmp'
         pending.write_bytes(compact(manifest))
         os.replace(pending, output / 'manifest.json')
@@ -174,7 +177,7 @@ def publish(output, stops, routes, walks, transfers, trips, days, meta, report, 
         if staging.exists():
             shutil.rmtree(staging)
 
-def compile_feed(feed, walking, output, start=None, scope=None, walking_areas=None):
+def compile_feed(feed, walking, output, start=None, scope=None, walking_areas=None, water_mask=None):
     from feed_scope import select_routes
     with zipfile.ZipFile(feed) as z:
         raw_stops = rows(z, 'stops.txt', True)
@@ -384,7 +387,23 @@ def compile_feed(feed, walking, output, start=None, scope=None, walking_areas=No
     except ValueError: source_updated=None
     meta = dict(demo=False,sourceVersion=source_version,sourceUpdated=source_updated,updated=datetime.now(timezone.utc).isoformat(),validFrom=begin.isoformat(),validTo=(end-timedelta(days=1)).isoformat(),walkingMaxMinutes=walk_meta['maxMinutes'],walkingSpeedKmh=4.8,walkingVersion=walk_meta['version']+'+'+TRANSFER_POLICY,transferWalking=transfer_access,walkingCoverage={'totalStops':len(stops),'boundStops':len({s['id'] for s in walk_meta['stops'] if s['id'] in stop_ids and not s.get('binding','').startswith('assumed-')}),'pairs':len(walks),'reviewed':walk_meta.get('reviewed',False)},warnings=warnings,attribution=['Planerad trafik: Trafiklab / Samtrafiken / SL']+walk_meta.get('attribution',[]))
     report = dict(transferWalking=transfer_access,stops=len(stops),retiredPlatforms=sum(s.get('retired',False) for s in stops),routes=len(routes),routeInventory=routes,scope=scope_report,modes=dict(Counter(r['mode'] for r in routes)),transferRows=len(rules),expandedRules=len(expanded),walkingEdges=len(walks),excludedRestricted=excluded,stopsWithoutOutgoingWalk=gaps,stopTimeRows=time_rows,routesWithoutSupportedBoarding=unsupported_routes,review='Not manually verified. Complete docs/review-cases.csv before pilot.')
-    publish(output,stops,routes,walks,expanded,trip_keys,days,meta,report,areas)
+    water=None
+    if water_mask:
+        root=Path(water_mask)
+        index=json.loads((root/'index.json').read_text())
+        if index.get('format')!='sliso-water-bitmap-v1' or index.get('schema')!=1 or index.get('resolution')!=512 or not 0.01<=index.get('tileDegrees',0)<=2:
+            raise ValueError('Invalid generated water bitmap index')
+        tiles=index.get('tiles')
+        if not isinstance(tiles,dict) or not tiles:raise ValueError('Empty water bitmap tiles')
+        water_files={}
+        for key,name in tiles.items():
+            x,y=map(int,key.split(','))
+            if key!=f'{x},{y}' or name!=f'water-{x}_{y}.bin':raise ValueError('Invalid water bitmap tile name')
+            raw=(root/name).read_bytes()
+            if len(raw)!=512*512//8:raise ValueError('Invalid water bitmap tile size')
+            water_files[name]=raw
+        water=dict(files=water_files,tiles=tiles,tileDegrees=index['tileDegrees'],resolution=512)
+    publish(output,stops,routes,walks,expanded,trip_keys,days,meta,report,areas,water)
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
@@ -393,10 +412,11 @@ if __name__ == '__main__':
     p.add_argument('--scope')
     p.add_argument('--walking-areas')
     p.add_argument('--footpaths')
+    p.add_argument('--water-mask',help='Precomputed bitmaps from the same walking OSM source')
     p.add_argument('--output',default='public/data')
     p.add_argument('--from-date',type=parse_date)
     a=p.parse_args()
-    compile_feed(a.gtfs,a.walks,a.output,a.from_date,a.scope,a.walking_areas)
+    compile_feed(a.gtfs,a.walks,a.output,a.from_date,a.scope,a.walking_areas,a.water_mask)
 
     if a.footpaths:
         from attach_footpaths import attach
