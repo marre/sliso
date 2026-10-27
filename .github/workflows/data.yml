@@ -43,7 +43,7 @@ jobs:
     # A download ledger must be retained for monthly quota protection.
     if: github.event_name == 'workflow_dispatch' || vars.SLISO_DATA_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -96,12 +96,20 @@ jobs:
         run: |
           python -m venv /tmp/sliso-walking-venv
           /tmp/sliso-walking-venv/bin/pip install -r scripts/requirements-walking.txt
-          walking_args=()
+          walking_args=(--current-osm)
           if test "${{ inputs.prepare_water }}" = 'true'; then
             /tmp/sliso-walking-venv/bin/pip install 'shapely>=2,<3'
             walking_args=(--water-output .data-build/prepared-walking/water-tiles)
           fi
           /tmp/sliso-walking-venv/bin/python scripts/prepare_walking.py --gtfs .data-build/sl.zip --output .data-build/prepared-walking "${walking_args[@]}"
+      - name: Save OSM source provenance
+        if: github.event_name == 'workflow_dispatch' && inputs.prepare_walking && !inputs.inventory_only
+        uses: actions/upload-artifact@v4
+        with:
+          name: sliso-walking-osm-source
+          path: .data-build/prepared-walking/osm-source.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Save generated water tiles for validation
         if: github.event_name == 'workflow_dispatch' && inputs.prepare_water
         uses: actions/upload-artifact@v4
