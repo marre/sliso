@@ -1,0 +1,67 @@
+name: Prepare OSM water-mask tiles (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      west:
+        description: Western longitude
+        default: '17.2'
+        required: true
+      south:
+        description: Southern latitude
+        default: '58.7'
+        required: true
+      east:
+        description: Eastern longitude
+        default: '19.8'
+        required: true
+      north:
+        description: Northern latitude
+        default: '60.4'
+        required: true
+permissions:
+  contents: read
+jobs:
+  water:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install OSM and geometry processing tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y osmium-tool gdal-bin
+          python -m pip install 'shapely>=2,<3'
+      - name: Test polygon clipping and island holes
+        run: python -m unittest discover -s tests -p 'water_mask_test.py'
+      - name: Cache verified OSM extract and coastline archive
+        uses: actions/cache@v4
+        with:
+          path: .data-build/water-cache
+          key: sliso-water-sources-v1
+      - name: Build clipped water tiles
+        env:
+          WEST: ${{ inputs.west }}
+          SOUTH: ${{ inputs.south }}
+          EAST: ${{ inputs.east }}
+          NORTH: ${{ inputs.north }}
+        run: python scripts/prepare_water_mask.py --output public/water-tiles --bounds "$WEST" "$SOUTH" "$EAST" "$NORTH"
+      - name: Verify tile size and manifest
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('public/water-tiles')
+          manifest=json.loads((root/'index.json').read_text())
+          assert manifest['tiles']
+          for tile in root.glob('*.json'):
+              assert tile.stat().st_size<25*1024*1024, f'{tile} exceeds Cloudflare asset limit'
+          print('Validated',len(manifest['tiles']),'tiles')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sliso-water-tiles
+          path: public/water-tiles/
+          retention-days: 7

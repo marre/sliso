@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sliso",
   "compatibility_date": "2026-10-19",
+  "previews": {},
   "assets": {
     "directory": "./dist",
     "not_found_handling": "none"

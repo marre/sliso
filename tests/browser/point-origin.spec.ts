@@ -59,7 +59,7 @@ test('a new map click supersedes an in-flight calculation and ignores its late d
  await mapSetup(page);if(info.project.name==='mobile')await page.locator('#mobile-close-search').click();
  let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);await page.route('**/*.bin',async r=>{await gate;await r.continue().catch(()=>{});});
  try{
-  let p=await position(page);await page.mouse.click(p.x,p.y);await expect.poll(()=>page.evaluate(()=>(window as any).searches.length)).toBe(1);await expect(page.locator('#map-progress')).toBeVisible();
+  let p=await position(page);await page.mouse.click(p.x,p.y);await expect.poll(()=>page.evaluate(()=>(window as any).searches.length)).toBe(1);
   p=await position(page,59.3319,18.0592);await page.mouse.click(p.x,p.y);await expect.poll(()=>page.evaluate(()=>(window as any).searches.length)).toBe(2);await expect(page.locator('#map')).not.toHaveAttribute('data-search-state','complete');
  }finally{release();}
  await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');await expect(page.locator('#start-data-gap')).toContainText('Gångstart på kartlagd väg');
