@@ -150,6 +150,9 @@ jobs:
             echo '::error::Footpath cache missing. Rebuild with prepare_walking=true; refusing to drop map origins.'
             exit 1
           fi
+          if test -f .data-build/prepared-walking/osm-source.json; then
+            area_args+=(--osm-source .data-build/prepared-walking/osm-source.json)
+          fi
           if test -f .data-build/prepared-walking/water-bitmap/index.json; then
             area_args+=(--water-mask .data-build/prepared-walking/water-bitmap)
           fi
