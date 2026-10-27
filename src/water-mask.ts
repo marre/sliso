@@ -12,7 +12,7 @@ function water():Promise<AreaGeometry[]> {
     if(!response.ok)throw new Error('Water mask unavailable');
     const data=await response.json() as WaterData;
     if(data.type!=='FeatureCollection'||!Array.isArray(data.features))throw new Error('Invalid water mask');
-    return data.features.filter(f=>f.geometry?.type==='Polygon'||f.geometry?.type==='MultiPolygon').map(f=>f.geometry!);
+    return data.features.flatMap((f):AreaGeometry[]=>f.geometry&&(f.geometry.type==='Polygon'||f.geometry.type==='MultiPolygon')?[f.geometry]:[]);
   }).catch(error=>{console.warn('Water mask disabled:',error);return [];});
 }
 
