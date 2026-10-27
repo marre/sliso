@@ -45,6 +45,56 @@ def fetch_osm(provenance, cache):
     raise RuntimeError('OSM download attempts exhausted')
 
 
+def fetch_latest_osm(url, cache, *, timeout=1800):
+    """Fetch a mutable Geofabrik latest URL, caching immutable checksum-verified bytes.
+
+    Resolve the current dated snapshot via the MD5 sidecar redirect so a
+    publication during download cannot mix checksums and file versions.
+    """
+    from urllib.parse import urljoin
+    from urllib.request import urlopen
+    import re
+
+    cache=Path(cache);cache.mkdir(parents=True,exist_ok=True)
+    if not url.endswith('-latest.osm.pbf'):
+        raise ValueError('Expected a Geofabrik latest OSM extract URL')
+    with urlopen(url+'.md5',timeout=120) as response:
+        sidecar_url=response.geturl()
+        sidecar=response.read(1024).decode('ascii')
+    match=re.match(r'^([0-9a-fA-F]{32})(?:\\s|$)',sidecar)
+    if not match:raise ValueError('Invalid Geofabrik MD5 sidecar')
+    checksum=match.group(1).lower()
+    # The resolved dated sidecar URL identifies the immutable snapshot.
+    source=sidecar_url[:-4]
+    if source.endswith('-latest.osm.pbf'):
+        # A mirror may serve latest directly. The MD5 still pins cache contents.
+        source=url
+    target=cache/(checksum+'.osm.pbf')
+    def verified(path):
+        if not path.exists():return False
+        with path.open('rb') as stream:
+            return hashlib.file_digest(stream,'md5').hexdigest()==checksum
+    if verified(target):
+        print('Reusing verified OSM extract:',target.name,flush=True)
+        return target
+    target.unlink(missing_ok=True)
+    part=cache/(checksum+'.part')
+    for attempt in range(1,4):
+        print(f'Fetching Geofabrik OSM snapshot: attempt {attempt}/3',flush=True)
+        result=subprocess.run(['curl','--fail','--location','--show-error',
+            '--connect-timeout','30','--max-time',str(timeout),'--continue-at','-',
+            '--output',str(part),source],check=False)
+        if verified(part):
+            part.replace(target)
+            print('OSM extract verified:',target.name,flush=True)
+            return target
+        if result.returncode==0:
+            part.unlink(missing_ok=True)
+            raise ValueError('Geofabrik OSM checksum mismatch')
+        if result.returncode==33:part.unlink(missing_ok=True)
+    raise RuntimeError('Unable to download verified Geofabrik OSM extract')
+
+
 def prepare(gtfs, output):
     provenance = json.loads(Path('data/walking-index.source.json').read_text())['osm']
     output = Path(output); output.mkdir(parents=True, exist_ok=True)
