@@ -23,6 +23,7 @@ export interface FileRef { url: string; sha256: string; bytes: number }
 export interface ContourFiles { format?: 'sliso-contours-v1'; index: Record<string, number>; files: FileRef[] }
 export interface Manifest {
   sourceVersion?: string; sourceUpdated?: string | null;
+  osmSource?: {source:string;md5:string;sha256:string;bytes:number;license:string};
   schema: 2; version: string; demo: boolean; updated: string; validFrom: string; validTo: string;
   walkingMaxMinutes: number; walkingVersion: string; walkingSpeedKmh: number;
   transferWalking?: {policy:string;eligibleRows:number;addedLinks:number;existingComponent:number;rejectedCost:number};
