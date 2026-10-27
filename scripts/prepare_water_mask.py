@@ -25,7 +25,7 @@ def build(output,cache,bounds,ocean_archive=None):
     with tempfile.TemporaryDirectory(prefix='sliso-water-') as temp:
         root=Path(temp)
         filtered=root/'water.osm.pbf'
-        run('osmium','tags-filter',pbf,'a/natural=water','a/waterway=riverbank','a/landuse=reservoir,basin','-o',filtered)
+        run('osmium','tags-filter',pbf,'wr/natural=water','wr/waterway=riverbank','wr/landuse=reservoir,basin','-o',filtered)
         raw=root/'water-all.geojson'
         run('osmium','export',filtered,'-f','geojson','-o',raw)
         inland=root/'water.geojson'
