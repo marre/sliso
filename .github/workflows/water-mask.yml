@@ -40,8 +40,12 @@ jobs:
           path: .data-build/water-cache
           key: sliso-water-sources-v1
       - name: Build clipped water tiles
-        run: |
-          python scripts/prepare_water_mask.py --output public/water-tiles --bounds "${{ inputs.west }}" "${{ inputs.south }}" "${{ inputs.east }}" "${{ inputs.north }}"
+        env:
+          WEST: ${{ inputs.west }}
+          SOUTH: ${{ inputs.south }}
+          EAST: ${{ inputs.east }}
+          NORTH: ${{ inputs.north }}
+        run: python scripts/prepare_water_mask.py --output public/water-tiles --bounds "$WEST" "$SOUTH" "$EAST" "$NORTH"
       - name: Verify tile size and manifest
         run: |
           python - <<'PY'
