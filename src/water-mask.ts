@@ -1,21 +1,18 @@
-import type {Manifest} from './core/types';
+import type {Manifest,FileRef} from './core/types';
+import {verified} from './core/data';
 
 type Mask=NonNullable<Manifest['waterMask']>;
 const requests=new Map<string,Promise<Uint8Array>>();
 const mercator=(lat:number)=>Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));
 const unmercator=(y:number)=>(2*Math.atan(Math.exp(y))-Math.PI/2)*180/Math.PI;
 
-async function bitmap(url:string,bytes:number):Promise<Uint8Array>{
-  let request=requests.get(url);
+async function bitmap(ref:FileRef):Promise<Uint8Array>{
+  const key=ref.url+':'+ref.sha256;
+  let request=requests.get(key);
   if(!request){
-    request=fetch(url).then(async response=>{
-      if(!response.ok)throw new Error('Missing water bitmap '+url);
-      const data=new Uint8Array(await response.arrayBuffer());
-      if(data.length!==bytes)throw new Error('Invalid water bitmap length');
-      return data;
-    });
-    requests.set(url,request);
-    request.catch(()=>requests.delete(url));
+    request=verified(ref).then(data=>new Uint8Array(data));
+    requests.set(key,request);
+    request.catch(()=>requests.delete(key));
   }
   return request;
 }
@@ -40,7 +37,7 @@ export class WaterMask {
         await Promise.all([...names].map(async name=>{
           const ref=m.tiles[name];
           if(!ref||ref.bytes!==n*n/8)throw new Error('Invalid water bitmap reference');
-          tiles.set(name,await bitmap(ref.url,ref.bytes));
+          tiles.set(name,await bitmap(ref));
         }));
       }catch(error){console.warn('Water mask unavailable:',error);return;}
       const pixels=new Uint8Array(width*height);
