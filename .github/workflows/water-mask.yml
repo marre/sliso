@@ -34,6 +34,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y osmium-tool gdal-bin
           python -m pip install 'shapely>=2,<3'
+      - name: Test polygon clipping and island holes
+        run: python -m unittest discover -s tests -p 'water_mask_test.py'
       - name: Cache verified OSM extract and coastline archive
         uses: actions/cache@v4
         with:
