@@ -100,7 +100,7 @@ jobs:
           walking_args=(--current-osm)
           if test "${{ inputs.prepare_water }}" = 'true'; then
             /tmp/sliso-walking-venv/bin/pip install 'shapely>=2,<3'
-            walking_args=(--water-output .data-build/prepared-walking/water-tiles)
+            walking_args+=(--water-output .data-build/prepared-walking/water-tiles)
           fi
           /tmp/sliso-walking-venv/bin/python scripts/prepare_walking.py --gtfs .data-build/sl.zip --output .data-build/prepared-walking "${walking_args[@]}"
       - name: Save OSM source provenance
