@@ -45,9 +45,18 @@ def build(output,cache,bounds,ocean_archive=None,pbf=None):
                     raise ValueError('OSMCoastline download is not a ZIP archive')
                 part.replace(ocean_archive)
         ocean=root/'ocean.geojson'
-        # GDAL can read shapefiles inside ZIP archives directly.
-        archive='/vsizip/'+str(Path(ocean_archive).resolve())
-        run('ogr2ogr','-f','GeoJSON',ocean,archive,'-spat',west,south,east,north,'-clipsrc',west,south,east,north,'-nlt','PROMOTE_TO_MULTI')
+        # The OSMCoastline ZIP contains a shapefile within a directory.
+        # GDAL cannot necessarily infer a datasource from the ZIP root.
+        import zipfile
+        with zipfile.ZipFile(ocean_archive) as zipped:
+            shapefiles=[name for name in zipped.namelist()
+                        if name.lower().endswith('.shp')
+                        and not name.startswith('__MACOSX/')]
+        if len(shapefiles)!=1:
+            raise ValueError('Expected exactly one ocean shapefile in OSMCoastline archive')
+        archive='/vsizip/'+str(Path(ocean_archive).resolve())+'/'+shapefiles[0]
+        run('ogr2ogr','-f','GeoJSON',ocean,archive,'-spat',west,south,east,north,
+            '-clipsrc',west,south,east,north,'-nlt','PROMOTE_TO_MULTI')
         run(sys.executable,'scripts/export_water_mask.py','--geojson',inland,'--ocean-geojson',ocean,'--output',output)
         run(sys.executable,'scripts/water_bitmap.py','--source',output,'--output',Path(output).parent/'water-bitmap')
         print('Water tiles prepared. Set VITE_WATER_TILES_URL=/water-tiles when deploying.',flush=True)
