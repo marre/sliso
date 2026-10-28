@@ -20,6 +20,8 @@ def build(output,cache,bounds,ocean_archive=None,pbf=None):
         raise ValueError('Invalid bounding box')
     if pbf is None:
         raise ValueError('Provide --pbf from the walking build; water tiles must use the same verified OSM source')
+    cache=Path(cache)
+    cache.mkdir(parents=True,exist_ok=True)
     pbf=Path(pbf)
     if not pbf.is_file():
         raise FileNotFoundError(pbf)
@@ -35,7 +37,13 @@ def build(output,cache,bounds,ocean_archive=None,pbf=None):
             ocean_archive=Path(cache)/'water-polygons-split-4326.zip'
             if not ocean_archive.exists():
                 print('Downloading OSMCoastline ocean polygons (may be large)',flush=True)
-                run('curl','--fail','--location','--retry','3','--connect-timeout','30','--output',ocean_archive,OCEAN_URL)
+                part=ocean_archive.with_suffix('.zip.part')
+                run('curl','--fail','--location','--show-error','--retry','3','--connect-timeout','30',
+                    '--continue-at','-','--output',part,OCEAN_URL)
+                import zipfile
+                if not zipfile.is_zipfile(part):
+                    raise ValueError('OSMCoastline download is not a ZIP archive')
+                part.replace(ocean_archive)
         ocean=root/'ocean.geojson'
         # GDAL can read shapefiles inside ZIP archives directly.
         archive='/vsizip/'+str(Path(ocean_archive).resolve())
