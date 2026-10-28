@@ -26,6 +26,7 @@ def attach(root,tiles):
     refs.extend(r for parts in migrated['days'].values() for r in parts)
     for layer in [migrated.get('walkingAreas',{}),migrated.get('walkingAreas',{}).get('overview',{})]:refs.extend(layer.get('files',[]))
     if migrated.get('walkingClosure'):refs.append(migrated['walkingClosure'])
+    if migrated.get('waterMask'):refs.extend(migrated['waterMask']['tiles'].values())
     with tempfile.TemporaryDirectory(prefix='.footpaths-',dir=root) as temp:
         staging=Path(temp)
         for ref in refs:

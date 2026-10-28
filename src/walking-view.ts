@@ -161,7 +161,7 @@ export class WalkingView {
           this.workerVersion=data.version;this.workerCutoffs=new Set(data.cachedCutoffs??[]);
           if(data.cutoff===this.cutoff&&(data.extent||this.image)){
             if(!this.image){
-              this.image=new BandCanvas(this.map,clip);
+              this.image=new BandCanvas(this.map,clip,manifest.waterMask);
               this.image.canvas.dataset.layer=overview?'overview':'detail';
               this.image.canvas.setAttribute('role','img');
               this.image.canvas.setAttribute('aria-label',overview?'Översiktliga gångområden. Zooma in för fullständig detalj.':'Gångområden med detaljerade restidsband.');

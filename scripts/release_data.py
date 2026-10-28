@@ -50,6 +50,13 @@ def validate(root):
     if paths:
         if paths.get('format')!='sliso-footpaths-v1' or paths.get('tileDegrees')!=.05 or not isinstance(paths.get('index'),dict):raise ValueError('Invalid footpath metadata')
         refs += list(paths['index'].values())
+    water=manifest.get('waterMask')
+    if water:
+        if water.get('format')!='sliso-water-bitmap-v1' or water.get('resolution')!=512 or not 0.01<=water.get('tileDegrees',0)<=2 or not water.get('tiles'):
+            raise ValueError('Invalid water mask metadata')
+        refs+=list(water['tiles'].values())
+        if any(ref.get('bytes') != 512*512//8 for ref in water['tiles'].values()):
+            raise ValueError('Invalid water mask tile size')
     areas = manifest.get('walkingAreas', {})
     refs += areas.get('files', [])
     refs += areas.get('overview', {}).get('files', [])
