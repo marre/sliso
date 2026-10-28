@@ -158,6 +158,9 @@ jobs:
             area_args+=(--water-mask .data-build/prepared-walking/water-bitmap)
           fi
           python scripts/build_data.py --gtfs .data-build/sl.zip --walks .data-build/walks.json --scope data/feed-scope.json --output .data-build/published "${area_args[@]}"
+      - name: Validate water release and geographic reference points
+        if: github.event_name == 'workflow_dispatch' && inputs.prepare_water
+        run: python scripts/verify_water_release.py --root .data-build/published
       - name: Audit precomputed walking profiles and outward station access
         if: github.event_name != 'workflow_dispatch' || !inputs.inventory_only
         run: python scripts/walking_coverage.py --manifest .data-build/published/manifest.json --output .data-build/walking-coverage.json --csv .data-build/walking-coverage-gaps.csv
