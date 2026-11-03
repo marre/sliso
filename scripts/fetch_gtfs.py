@@ -31,6 +31,8 @@ def fetch(output, ledger, initialize=False, persist=None):
     if state.get('month') != month:
         state={'month':month,'attempts':0}
     if state.get('successDate') == day and output.exists() and hashlib.sha256(output.read_bytes()).hexdigest() == state.get('sha256'):
+        if persist:
+            persist(ledger)  # Also migrate a legacy journal on a source-cache hit.
         print('Reusing validated source from today; no download.')
         return
     if state['attempts'] >= 45:

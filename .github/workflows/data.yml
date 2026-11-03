@@ -51,35 +51,38 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Restore once-daily source
-        id: source-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: .data-build/sl.zip
-          key: sliso-source-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            sliso-source-
-      - name: Restore legacy journal for one-time migration
-        if: steps.source-cache.outputs.cache-matched-key == ''
-        uses: actions/cache/restore@v4
-        with:
-          path: .data-build/
-          key: sliso-data-migration-${{ github.run_id }}
-          restore-keys: sliso-data-
       - name: Restore durable Trafiklab quota journal
+        id: quota-state
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           if git ls-remote --exit-code --heads origin data-state; then
             git fetch origin data-state
             git worktree add .quota-state FETCH_HEAD
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
           else
             git worktree add --detach .quota-state HEAD
-            # Bootstrap once from the existing journal, never reset it silently.
-            if test -f .data-build/quota.json; then
-              cp .data-build/quota.json .quota-state/quota.json
-            fi
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
           fi
+      - name: Restore legacy journal for one-time migration
+        if: steps.quota-state.outputs.exists != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: .data-build/
+          key: sliso-data-migration-${{ github.run_id }}
+          restore-keys: sliso-data-
+      - name: Import legacy quota journal without resetting its counter
+        if: steps.quota-state.outputs.exists != 'true'
+        run: |
+          if test -f .data-build/quota.json; then
+            cp .data-build/quota.json .quota-state/quota.json
+          fi
+      - name: Restore once-daily source
+        uses: actions/cache/restore@v4
+        with:
+          path: .data-build/sl.zip
+          key: sliso-source-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: sliso-source-
       - name: Require versioned physical walking input
         if: github.event_name != 'workflow_dispatch' || !inputs.inventory_only
         run: test -f data/walking-index.json || test -f data/walking-graph.json

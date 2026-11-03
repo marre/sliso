@@ -51,7 +51,10 @@ class QuotaTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);ledger=root/'quota.json';out=root/'sl.zip'
             with patch.dict(os.environ,{'TRAFIKLAB_GTFS_KEY':'NOT-A-REAL-KEY'}),patch('urllib.request.urlopen',return_value=Response(raw.getvalue())) as req:
-                fetch(out,ledger,True);fetch(out,ledger)
+                fetch(out,ledger,True)
+                saved=[]
+                fetch(out,ledger,persist=lambda p:saved.append(json.loads(p.read_text())))
+                self.assertEqual(saved[0]['attempts'],1)
                 self.assertEqual(req.call_count,1)
                 self.assertEqual(json.loads(ledger.read_text())['attempts'],1)
 
