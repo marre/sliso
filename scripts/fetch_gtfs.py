@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-def fetch(output, ledger, initialize=False):
+def fetch(output, ledger, initialize=False, persist=None):
     output, ledger = Path(output), Path(ledger)
     now = datetime.now(timezone.utc)
     day, month = now.date().isoformat(), now.strftime('%Y-%m')
@@ -40,6 +40,8 @@ def fetch(output, ledger, initialize=False):
         raise ValueError('TRAFIKLAB_GTFS_KEY missing; configure a CI secret, not a VITE_ variable.')
     state['attempts'] += 1
     ledger.write_text(json.dumps(state))  # Count failed attempts too, before network access.
+    if persist:
+        persist(ledger)  # A failed durable reservation MUST prevent the download.
     url='https://opendata.samtrafiken.se/gtfs/sl/sl.zip?' + urllib.parse.urlencode({'key':key})
     # Trafiklab requires client-side gzip support (GTFS Regional OpenAPI).
     # urllib otherwise sends Accept-Encoding: identity, which can cause HTTP 406.
@@ -66,6 +68,8 @@ def fetch(output, ledger, initialize=False):
         os.replace(temp,output)
         state.update(successDate=day,sha256=hashlib.sha256(output.read_bytes()).hexdigest())
         ledger.write_text(json.dumps(state))
+        if persist:
+            persist(ledger)
         print('GTFS downloaded and ZIP integrity verified.')
     except (gzip.BadGzipFile, EOFError, zlib.error):
         raise ValueError('GTFS HTTP gzip integrity check failed; archive was not used.') from None
@@ -77,7 +81,8 @@ def fetch(output, ledger, initialize=False):
         if temp and temp.exists():temp.unlink()
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',required=True);p.add_argument('--ledger',required=True);p.add_argument('--init-ledger',action='store_true');a=p.parse_args()
-    try:fetch(a.output,a.ledger,a.init_ledger)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',required=True);p.add_argument('--ledger',required=True);p.add_argument('--init-ledger',action='store_true');p.add_argument('--persist-ledger',action='store_true');a=p.parse_args()
+    from persist_quota import persist
+    try:fetch(a.output,a.ledger,a.init_ledger,persist if a.persist_ledger else None)
     except (ValueError,zipfile.BadZipFile) as e:
         print(str(e));raise SystemExit(1)

@@ -1,5 +1,8 @@
-name: Prepare SL data (opt-in)
+name: Refresh SL traffic data
 on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/data.yml]
   workflow_dispatch:
     inputs:
       prepare_walking:
@@ -39,9 +42,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    # Enabling this does NOT deploy or make the repository public.
-    # A download ledger must be retained for monthly quota protection.
-    if: github.event_name == 'workflow_dispatch' || vars.SLISO_DATA_ENABLED == 'true'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
@@ -49,12 +51,35 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Cache quota ledger and once-daily source
+      - name: Restore once-daily source
+        id: source-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .data-build/sl.zip
+          key: sliso-source-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            sliso-source-
+      - name: Restore legacy journal for one-time migration
+        if: steps.source-cache.outputs.cache-matched-key == ''
         uses: actions/cache/restore@v4
         with:
           path: .data-build/
-          key: sliso-data-${{ github.run_id }}-${{ github.run_attempt }}
+          key: sliso-data-migration-${{ github.run_id }}
           restore-keys: sliso-data-
+      - name: Restore durable Trafiklab quota journal
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git ls-remote --exit-code --heads origin data-state; then
+            git fetch origin data-state
+            git worktree add .quota-state FETCH_HEAD
+          else
+            git worktree add --detach .quota-state HEAD
+            # Bootstrap once from the existing journal, never reset it silently.
+            if test -f .data-build/quota.json; then
+              cp .data-build/quota.json .quota-state/quota.json
+            fi
+          fi
       - name: Require versioned physical walking input
         if: github.event_name != 'workflow_dispatch' || !inputs.inventory_only
         run: test -f data/walking-index.json || test -f data/walking-graph.json
@@ -62,11 +87,11 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.initialize_quota_ledger
         env:
           TRAFIKLAB_GTFS_KEY: ${{ secrets.TRAFIKLAB_GTFS_KEY }}
-        run: python scripts/fetch_gtfs.py --output .data-build/sl.zip --ledger .data-build/quota.json --init-ledger
+        run: python scripts/fetch_gtfs.py --output .data-build/sl.zip --ledger .quota-state/quota.json --persist-ledger --init-ledger
       - name: Fetch at most once per day, enforce local monthly ceiling
         env:
           TRAFIKLAB_GTFS_KEY: ${{ secrets.TRAFIKLAB_GTFS_KEY }}
-        run: python scripts/fetch_gtfs.py --output .data-build/sl.zip --ledger .data-build/quota.json
+        run: python scripts/fetch_gtfs.py --output .data-build/sl.zip --ledger .quota-state/quota.json --persist-ledger
       - name: Export validated source for local data processing
         if: github.event_name == 'workflow_dispatch' && inputs.export_source
         uses: actions/upload-artifact@v4
@@ -81,30 +106,65 @@ jobs:
           name: sliso-gtfs-inventory
           path: .data-build/inventory/
           retention-days: 7
+      - name: Restore shared walking inputs
+        if: github.event_name != 'workflow_dispatch' || !inputs.inventory_only
+        uses: actions/cache/restore@v4
+        with:
+          path: .data-build/prepared-walking
+          key: sliso-walking-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: sliso-walking-v1-
+      - name: Select weekly walking rebuild or recover a missing cache
+        id: walking
+        if: github.event_name != 'workflow_dispatch' || !inputs.inventory_only
+        env:
+          EVENT: ${{ github.event_name }}
+          REQUEST_WALKING: ${{ inputs.prepare_walking }}
+          REQUEST_WATER: ${{ inputs.prepare_water }}
+        run: |
+          rebuild=false
+          if test "$REQUEST_WALKING" = true || { test "$EVENT" = schedule && test "$(date -u +%u)" = 7; } || ! test -f .data-build/prepared-walking/.complete; then
+            rebuild=true
+          fi
+          water=false
+          if test "$REQUEST_WATER" = true || test -f .data-build/prepared-walking/water-bitmap/index.json || python -c "import json,sys; sys.exit(0 if json.load(open('data/release.json')).get('features',{}).get('waterMask') else 1)"; then
+            water=true
+          fi
+          echo "rebuild=$rebuild" >> "$GITHUB_OUTPUT"
+          echo "water=$water" >> "$GITHUB_OUTPUT"
       - name: Require walking rebuild when water generation is requested
         if: github.event_name == 'workflow_dispatch' && inputs.prepare_water && (!inputs.prepare_walking || inputs.inventory_only)
         run: |
           echo '::error::prepare_water requires prepare_walking=true and inventory_only=false'
           exit 1
       - name: Install water extraction tools
-        if: github.event_name == 'workflow_dispatch' && inputs.prepare_water
+        if: steps.walking.outputs.water == 'true' && steps.walking.outputs.rebuild == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y osmium-tool gdal-bin
       - name: Rebuild optional walking distances and network areas
-        if: github.event_name == 'workflow_dispatch' && inputs.prepare_walking && !inputs.inventory_only
+        if: steps.walking.outputs.rebuild == 'true'
         run: |
           rm -rf .data-build/prepared-walking
           python -m venv /tmp/sliso-walking-venv
           /tmp/sliso-walking-venv/bin/pip install -r scripts/requirements-walking.txt
           walking_args=(--current-osm)
-          if test "${{ inputs.prepare_water }}" = 'true'; then
+          if test "${{ steps.walking.outputs.water }}" = 'true'; then
             /tmp/sliso-walking-venv/bin/pip install 'shapely>=2,<3'
             walking_args+=(--water-output .data-build/prepared-walking/water-tiles)
           fi
           /tmp/sliso-walking-venv/bin/python scripts/prepare_walking.py --gtfs .data-build/sl.zip --output .data-build/prepared-walking "${walking_args[@]}"
+          touch .data-build/prepared-walking/.complete
+      - name: Cache completed walking inputs for nightly reuse
+        if: steps.walking.outputs.rebuild == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .data-build/prepared-walking
+          key: sliso-walking-v1-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Reconcile cached walking endpoints with current traffic stops
+        if: github.event_name != 'workflow_dispatch' || !inputs.inventory_only
+        run: python scripts/refresh_walking.py --root .data-build/prepared-walking --gtfs .data-build/sl.zip
       - name: Save OSM source provenance
-        if: github.event_name == 'workflow_dispatch' && inputs.prepare_walking && !inputs.inventory_only
+        if: steps.walking.outputs.rebuild == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sliso-walking-osm-source
@@ -112,7 +172,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Save generated water tiles for validation
-        if: github.event_name == 'workflow_dispatch' && inputs.prepare_water
+        if: steps.walking.outputs.water == 'true' && steps.walking.outputs.rebuild == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sliso-water-tiles
@@ -151,15 +211,15 @@ jobs:
             echo '::error::Footpath cache missing. Rebuild with prepare_walking=true; refusing to drop map origins.'
             exit 1
           fi
-          if test "${{ inputs.prepare_walking }}" = 'true' && test -f .data-build/prepared-walking/osm-source.json; then
+          if test -f .data-build/prepared-walking/osm-source.json; then
             area_args+=(--osm-source .data-build/prepared-walking/osm-source.json)
           fi
-          if test "${{ inputs.prepare_walking }}" = 'true' && test "${{ inputs.prepare_water }}" = 'true' && test -f .data-build/prepared-walking/water-bitmap/index.json; then
+          if test -f .data-build/prepared-walking/water-bitmap/index.json; then
             area_args+=(--water-mask .data-build/prepared-walking/water-bitmap)
           fi
           python scripts/build_data.py --gtfs .data-build/sl.zip --walks .data-build/walks.json --scope data/feed-scope.json --output .data-build/published "${area_args[@]}"
       - name: Validate water release and geographic reference points
-        if: github.event_name == 'workflow_dispatch' && inputs.prepare_water
+        if: steps.walking.outputs.water == 'true'
         run: python scripts/verify_water_release.py --root .data-build/published
       - name: Audit precomputed walking profiles and outward station access
         if: github.event_name != 'workflow_dispatch' || !inputs.inventory_only
@@ -194,21 +254,21 @@ jobs:
           path: dist/
           retention-days: 3
       - name: Publish on Cloudflare Pages only after explicit opt-in
-        if: vars.SLISO_DEPLOY_ENABLED == 'true' && (github.event_name != 'workflow_dispatch' || inputs.deploy) && (github.event_name != 'workflow_dispatch' || !inputs.inventory_only)
+        if: vars.SLISO_DEPLOY_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && inputs.deploy && (github.event_name != 'workflow_dispatch' || !inputs.inventory_only)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name=sliso
-      - name: Persist quota even after a failed download or validation
+      - name: Cache validated source (quota reservations are already durable)
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: .data-build/
-          key: sliso-data-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .data-build/sl.zip
+          key: sliso-source-${{ github.run_id }}-${{ github.run_attempt }}
 
   publish-release:
-    if: (github.event_name == 'workflow_dispatch' && inputs.publish_release && !inputs.inventory_only) || (github.event_name == 'schedule' && vars.SLISO_RELEASE_ENABLED == 'true')
+    if: (github.event_name == 'workflow_dispatch' && inputs.publish_release && !inputs.inventory_only) || github.event_name == 'schedule' || github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15

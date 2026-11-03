@@ -1,26 +1,28 @@
 # Drift och kvoter
 
-Tjänsten är en utvecklingsversion. Beställaren har publicerat appen via Cloudflares Git-integration till `sliso.markus-eriksson.workers.dev`. Automatisk daglig datahämtning är fortfarande avstängd. Riktiga tidtabellspaket och ett partiellt gångindex har byggts; gångluckor märks i appen. Repot är publikt enligt GitHub, men dess synlighet har inte ändrats av agenten.
+Tjänsten är en utvecklingsversion. Beställaren har publicerat appen via Cloudflares Git-integration till `sliso.markus-eriksson.workers.dev`. Trafikdata uppdateras automatiskt varje natt; gångkartan byggs om på söndagar och vid saknad gångcache. Riktiga tidtabellspaket och ett partiellt gångindex har byggts; gångluckor märks i appen. Repot är publikt enligt GitHub, men dess synlighet har inte ändrats av agenten.
 
 ## GitHub Actions
 
 `TRAFIKLAB_GTFS_KEY` finns enligt beställaren som Actions repository secret. Den har verifierats genom lyckad hämtning och inventering. Den behövs aldrig i webbläsaren eller en `VITE_`-variabel.
 
-Öppna **Actions → Prepare SL data (opt-in) → Run workflow** på `main`:
+Öppna **Actions → Refresh SL traffic data → Run workflow** på `main`:
 
 | Input | Funktion |
 | --- | --- |
 | `inventory_only=true` | Hämta/cachea och inventera trafikdata, utan appbygge eller deployment. |
-| `inventory_only=false` | Kompilera riktig tidtabell med `data/feed-scope.json` och det medföljande partiella `data/walking-index.json`, testa och bygg appen. |
-| `initialize_quota_ledger=false` | Återanvänd sparad bokföring. Välj true endast första gången eller efter bekräftad cacheförlust och kontroll av kvarvarande Trafiklab-kvot. |
+| `inventory_only=false` | Kompilera aktuell tidtabell med `data/feed-scope.json` och det cacheade gångunderlaget, testa och bygg appen. |
+| `initialize_quota_ledger=false` | Återanvänd sparad bokföring. Välj true endast om den beständiga journalen saknas och kvarvarande Trafiklab-kvot har kontrollerats. |
 | `export_source=false` | Normalläge. True exporterar validerad rå GTFS som ett separat artefakt för lokal bearbetning; retention 1 dag. |
-| `prepare_walking=false` | True bygger om gångavstånd och ungefärliga gångområden från den checksummebundna OSM-källan. Kör vid första aktivering, cacheförlust eller förnyat gångunderlag. Den checksummeverifierade PBF-källan sparas i Actions-cache tillsammans med förberedda index och konturer. Tiles används temporärt. |
+| `prepare_walking=false` | Återanvänd gångcachen (bygg om automatiskt om den saknas). True bygger manuellt om gångavstånd, gångområden och kartans gångnät från aktuell verifierad OSM-källa. |
 | `publish_release=false` | True publicerar kompilerade data som en versionsmärkt GitHub Release och uppdaterar den lilla `data/release.json` i Git. Det triggar Cloudflares befintliga Git-integration. Kräver `inventory_only=false`. |
 | `deploy=false` | Bygg för granskning utan att publicera. True kräver dessutom `SLISO_DEPLOY_ENABLED=true` och Cloudflare-inställningarna nedan. |
 
 Artefakten `sliso-gtfs-inventory` innehåller rapport, hållplatser och linjer (7 dagars retention). Ett fullt bygge ger `sliso-validated-data` med `dist/` (3 dagar). Check-workflowens demo är separat och publiceras inte.
 
-`SLISO_DATA_ENABLED=true` aktiverar dagliga hela databyggningar 03.17 UTC. Standard är av. Schemat ska inte aktiveras förrän ägaren har granskat kvoter och accepterat att det befintliga gångindexet ännu är partiellt. Vid flyttade/borttagna hållplatsbindningar stoppas bygget i stället för att återanvända gamla gångtider.
+Varje natt 03.17 UTC (04.17 svensk vintertid, 05.17 sommartid) byggs och publiceras trafikdata automatiskt. GitHub kan fördröja schemat. De tidigare variablerna `SLISO_DATA_ENABLED` och `SLISO_RELEASE_ENABLED` behövs inte. En ändring av detta workflow på `main` startar också ett trafikbygge, så att driftfixar verifieras direkt. Releasepekarens dagliga commit startar inte ännu ett databyggningsjobb.
+
+På söndagar byggs gångunderlaget om från aktuell verifierad OSM-källa. Det färdiga gångunderlaget har en separat cache (`sliso-walking-v1-`) som återställs av varje nattjobb. Återställningen håller cachen aktiv, men GitHub kan ändå rensa den vid platsbrist. Saknad cache ger därför ett automatiskt gångbygge även en annan natt. Rå OSM/PBF och gamla publicerade datapaket ligger inte i denna cache; bara återanvändbara gångindata sparas. Oförändrade hållplats-ID:n och koordinater behåller gånganslutningar och konturer. Flyttade/borttagna lägen kopplas bort från gamla fysiska gångkanter, konturer och kartankare; nya lägen får inga påhittade fysiska anslutningar. Uppskattade namnbyten och deklarerade GTFS-byten räknas om från aktuell feed. Granskade stationspassagers befintliga validering gäller fortfarande. Gångnätets version, vattenmask och OSM-proveniens bevaras.
 
 ## Hämtning och återhämtning
 
@@ -28,7 +30,7 @@ Källadress: `https://opendata.samtrafiken.se/gtfs/sl/sl.zip`. GTFS Regional kr�
 
 Trafikdagar och turbundna regler kompileras till manifest schema 2 med UTC-timblock. `sourceUpdated` anger publicerad feedversion när datumet är känt; `updated` anger bygget. Appen markerar äldre källa och avvisar datum utan datatäckning. Vid ett misslyckat bygge förblir senast distribuerade version kvar; ingen automatisk betald reservtjänst används.
 
-Kvotledger och source-ZIP återställs från CI-cache. Samma validerade ZIP återanvänds inom UTC-datumet. Även misslyckade anropsförsök räknas och ledger sparas med `always()`. Saknad ledger stoppar nätanrop; den återställs inte tyst. Nytt kalendermånadsskifte nollställer den lokala månadsräknaren. Andra klienter med samma API-nyckel måste räknas separat.
+Kvotjournalen ligger i `quota.json` på branchen `data-state`. Varje anropsförsök committas och pushas **före** Trafiklab-anropet; om lagringen misslyckas görs inget anrop. Det skyddar även vid avbrutna jobb och cacheförlust. Vid första övergången importeras den gamla journalen från Actions-cache. Saknas både beständig journal och gammal cache stoppas hämtningen; använd då uttrycklig initiering efter kvotkontroll. Source-ZIP cacheas separat och återanvänds checksummeverifierad inom UTC-datumet. Ny kalendermånad nollställer månadsräknaren; taket är fortsatt 45 försök. Andra klienter med samma nyckel räknas separat. `data-state` kör inte Checks och ska inte vara Cloudflares produktionsbranch.
 
 Efter en kodfix: **Run workflow** på senaste `main`, inte **Re-run jobs** på en äldre commit. Om API-nyckeln ändrats efter ett misslyckat försök gör nästa körning ett nytt försök; ingen ny secret behövs.
 
@@ -55,11 +57,11 @@ I **sliso → Settings → Build** i Cloudflare används:
 
 Cloudflares befintliga integration sköter autentiseringen. Ingen ny Cloudflare- eller Trafiklab-hemlighet behövs för detta flöde, och ingen R2-bucket krävs. Det publika datapaketet hämtas under bygget; besökare hämtar data från samma Cloudflare-origin som appen.
 
-För första releasen med gångområden körs `prepare_walking=true`, `inventory_only=false` och `publish_release=true`. Senare tidtabellsbyggen återanvänder förberedd gångdata från Actions-cache; ändrade hållplatskoordinater stoppar bygget för omgranskning/ombyggnad. Om en release redan har gångområden men förberedelsecachen saknas stoppas bygget i stället för att tyst ta bort funktionen.
+För att uppdatera gångkartan körs `prepare_walking=true`, `inventory_only=false` och `publish_release=true` manuellt. Detta fungerar även mellan söndagens automatiska gångbyggen. Trafikbyggen återanvänder därefter gångcachen. Vattenmasken och dess OSM-proveniens behålls när gångdata återanvänds; om releasen har vattenmask byggs den om tillsammans med nästa gångkarta.
 
 `npm run data:pull` tvingar en verifierad hämtning av den versionslåsta releasen även när lokal data finns. Vanligt `npm run build` bevarar befintlig lokal data, inklusive uttryckligt skapade testfixturer. Stora dataarkiv och `public/data` ska aldrig checkas in. En tidtabellsversion utan gångområden är cirka 77 MB komprimerad; gångkonturer och sparade tidigare versioner ökar arkivets storlek. De större gångindexen ryms fortfarande under 25 MiB per fil. Total storlek hindrar inte statisk publicering eftersom varje fil ligger under 25 MiB. Aktuell och tidigare sparade versioner paketeras tillsammans för redan öppna klienter.
 
-Daglig hämtning aktiveras inte av detta. Kör ovanstående manuella flöde för en ny datarelease. För avsiktlig daglig uppdatering via Git-integrationen behövs både `SLISO_DATA_ENABLED=true` (bygga) och `SLISO_RELEASE_ENABLED=true` (publicera release och uppdatera pekaren). Ingendera aktiveras av kodändringen. Gamla GitHub Releases ligger kvar tills ägaren väljer en separat retentionspolicy; de är skilda från Actions-artefakternas korta retention.
+Nattjobbet publicerar alltid en validerad GitHub Release och uppdaterar pekaren på `main`; Cloudflares befintliga Git-integration publicerar webbplatsen. Misslyckade byggen ersätter inte den senaste fungerande releasen. Gamla GitHub Releases ligger kvar tills ägaren väljer en separat retentionspolicy.
 
 ## Alternativ: Cloudflare Pages från Actions
 

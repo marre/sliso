@@ -34,6 +34,17 @@ class QuotaTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'network/TLS failure') as error:fetch(root/'sl.zip',ledger,True)
                 self.assertNotIn('secret URL',str(error.exception))
                 self.assertEqual(json.loads(ledger.read_text())['attempts'],1)
+    def test_durable_reservation_failure_prevents_network_access(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            def fail(ledger):
+                self.assertEqual(json.loads(ledger.read_text())['attempts'],1)
+                raise RuntimeError('push failed')
+            with patch.dict(os.environ,{'TRAFIKLAB_GTFS_KEY':'fake'}),patch('urllib.request.urlopen') as req:
+                with self.assertRaisesRegex(RuntimeError,'push failed'):
+                    fetch(root/'sl.zip',root/'quota.json',True,fail)
+                req.assert_not_called()
+
     def test_same_day_reuses_verified_zip(self):
         raw=io.BytesIO()
         with zipfile.ZipFile(raw,'w') as z:z.writestr('stops.txt','stop_id\na')
