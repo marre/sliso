@@ -50,7 +50,7 @@ Webbläsartester skapar egna demofixturer i `.data-build/browser-public` och anv
 - Gångsträckor visar meter/kilometer från gångnätet och gångtid, inklusive en totalsumma. Valbara färgade gångområden tar hänsyn till återstående restid och kvarvarande gångbudget. Områdena bygger på lokalt förberäknade OSM/Valhalla-konturer i enminutssteg; de är ungefärliga och saknas där hållplatsen inte har en känd gånganslutning.
 - Tangentbordsåtkomliga hållplatsmarkörer och delningslänk i URL-fragmentet.
 - Versionsbundna SHA-256-kontrollerade data, binära timblock och frivillig Cache API-lagring med minnesfallback.
-- GTFS-import, offlineförberäkning av gångpar från ett konservativt OSM-nät eller en granskad gånggraf och opt-in CI för dagliga databyggningar.
+- GTFS-import, offlineförberäkning av gångpar från ett konservativt OSM-nät eller en granskad gånggraf och nattlig CI för trafikdata och veckovisa gångkartsbyggen.
 
 ## Restidsmodell
 
@@ -64,7 +64,7 @@ En gångsträcka summeras över flera kanter och återställs först vid påstig
 
 Se [dataflöde och filformat](docs/data.md), [drift och kvoter](docs/operations.md), [verifiering och öppna datagap](docs/verification.md) och [ursprunglig kravspecifikation](docs/kravspec.md).
 
-Cloudflare Workers Git-integration: bygg `npm run build`, deploy `npx wrangler deploy`. `prebuild` hämtar den verifierade datareleasen när `public/data/manifest.json` saknas. Bara `data/release.json` ligger i Git; det stora arkivet ligger i GitHub Releases. Se [driftinstruktionerna](docs/operations.md). Cloudflare Pages kan också publicera samma `dist`. Kontrollworkflow bygger demo enbart för tester; det publicerar inget. Automatiska datakörningar är avstängda tills driftansvarig konfigurerar data, kvotledger och CI-variabler. Ett manuellt inventeringsläge kan köras med Trafiklab-hemligheten och kvotinitiering; se driftinstruktionerna. Repots synlighet har inte ändrats.
+Cloudflare Workers Git-integration: bygg `npm run build`, deploy `npx wrangler deploy`. `prebuild` hämtar den verifierade datareleasen när `public/data/manifest.json` saknas. Bara `data/release.json` ligger i Git; det stora arkivet ligger i GitHub Releases. Se [driftinstruktionerna](docs/operations.md). Cloudflare Pages kan också publicera samma `dist`. Kontrollworkflow bygger demo enbart för tester; det publicerar inget. Trafikdata byggs och publiceras automatiskt varje natt 03.17 UTC. Gångkartan byggs om på söndagar, vid saknad gångcache eller på manuell begäran; nattjobben återanvänder den däremellan. Ett manuellt inventeringsläge kan köras med Trafiklab-hemligheten och kvotinitiering; se driftinstruktionerna. Repots synlighet har inte ändrats.
 
 Bakgrundskartan använder Maptoolkit.orgs fria vektorkarta: `https://styles.maptoolkit.org/summer.json`, utan API-nyckel. Maptoolkits logotyp och kartans upphovsrättslänkar visas på alla skärmstorlekar. `.env.example` visar den valfria inställningen `VITE_MAP_STYLE_URL`; värdet `none` stänger av externa kartanrop utan att påverka sökningen. MapLibre och dess worker samt appens typsnitt levereras med appen. Inga hemligheter får ligga i `VITE_`-variabler, delningslänkar eller apppaketet.
 
