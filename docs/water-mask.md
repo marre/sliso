@@ -98,6 +98,7 @@ equality with the unavailable upstream. A changed mirror snapshot must be
 reviewed and pinned explicitly rather than silently accepting new bytes.
 The build records the ocean source beside the prepared walking inputs.
 
-The former “outer archipelago” reference at 18.700, 59.350 is on land near
-Argboda. It is now a land check; 19.500, 59.350 supplies an open Baltic Sea
-water check instead. Inland water remains checked separately at Riddarfjärden.
+The reference at 18.700, 59.350 near Argboda is inland water, absent from
+the ocean-only polygons but present in the combined OSM water mask. Keep it
+as a water check; 19.500, 59.350 adds an unambiguous open Baltic Sea check.
+Inland water is also checked at Riddarfjärden.
