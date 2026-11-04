@@ -1,0 +1,35 @@
+name: Publish validated water release
+on:
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: sliso-validated-data
+          run-id: 41895045189
+          github-token: ${{ github.token }}
+          path: .release-build
+      - run: python scripts/verify_water_release.py --root .release-build/data
+      - run: python scripts/release_data.py pack --root .release-build/data --output .data-build/sliso-data.zip --descriptor .data-build/release.json --repository "$GITHUB_REPOSITORY"
+      - name: Verify the approved archive and upload it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('.data-build/release.json'))
+          assert r['version']=='sl-50332a83c383a786d3f3'
+          assert r['sha256']=='f0da352fd2d7c25b98c9c7bcdbbd5c789003479e5250233914d2525e8c99b64e'
+          assert r['features']['waterMask'] is True
+          PY
+          gh release upload data-sl-50332a83c383a786d3f3 .data-build/sliso-data.zip
