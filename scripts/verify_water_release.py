@@ -12,7 +12,8 @@ LANDMARKS=[
     ('Sodermalm',18.072,59.312,False),
     ('Saltsjon',18.150,59.318,True),
     ('Riddarfjarden',18.040,59.321,True),
-    ('Outer archipelago',18.700,59.350,True),
+    ('Argboda land',18.700,59.350,False),
+    ('Open Baltic Sea',19.500,59.350,True),
 ]
 
 def verify(root):

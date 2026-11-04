@@ -88,3 +88,16 @@ Resume when the authoritative source is reachable, or provide a previously
 verified OSMCoastline WGS84 ocean archive through the existing
 `prepare_walking.py --ocean-archive <path>` option. Do not omit ocean polygons:
 inland water alone cannot mask the Stockholm archipelago correctly.
+
+### Mirror-backed build
+
+`data/ocean-source.json` pins the explicitly selected unofficial mirror at
+https://www.osmdata.org/ by HTTPS URL, size and SHA-256. ZIP integrity and the
+WGS84 shapefile were checked locally; this does not establish byte-for-byte
+equality with the unavailable upstream. A changed mirror snapshot must be
+reviewed and pinned explicitly rather than silently accepting new bytes.
+The build records the ocean source beside the prepared walking inputs.
+
+The former “outer archipelago” reference at 18.700, 59.350 is on land near
+Argboda. It is now a land check; 19.500, 59.350 supplies an open Baltic Sea
+water check instead. Inland water remains checked separately at Riddarfjärden.
