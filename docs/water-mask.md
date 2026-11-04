@@ -45,3 +45,46 @@ no longer used.
 Before merging, run Python and browser tests and one complete manual walking
 build with water enabled, inspect coastal coverage, and verify the publication
 size budget. Production deployment remains opt-in.
+
+## Non-publishing validation run
+
+Start the complete build explicitly, without changing the release pointer:
+
+```sh
+gh workflow run data.yml --repo marre/sliso --ref main \
+  -f inventory_only=false -f prepare_walking=true -f prepare_water=true \
+  -f publish_release=false -f deploy=false -f export_source=false \
+  -f initialize_quota_ledger=false
+```
+
+Wait for the build to succeed and download `sliso-validated-data` into a separate
+staging directory. Run `scripts/verify_water_release.py --root <staging>/data`
+before packaging with `scripts/release_data.py pack`. Keep the generated release
+archive and descriptor outside tracked `data/release.json` until publication.
+The workflow refreshes the shared walking cache; subsequent scheduled builds can
+reuse the completed water-enabled inputs.
+
+Departure and arrival raster layers both use the manifest's verified water mask.
+If a declared mask cannot be loaded or its metadata is invalid, the affected
+raster is hidden rather than displayed without clipping. Releases without a
+mask retain legacy behaviour. Missing tiles are not proof of land: inspect the
+configured geographic coverage as part of release validation.
+
+Local regressions: `npm test`, `npm run test:python`, `npm run build`, and
+`npx playwright test tests/browser/water.spec.ts`. The browser test checks water
+removal and island preservation at two zoom levels on desktop and mobile.
+Real coastlines, narrow islands and bridges still require geographic inspection;
+a raster mask does not validate the underlying walking routes.
+
+### Validation attempt, 2026-11-04
+
+Non-publishing run: https://github.com/marre/sliso/actions/runs/41889015340
+The verified Sweden OSM download succeeded, but the OSMCoastline ocean ZIP
+connection timed out after all retries. An independent request from the cloud
+development environment returned HTTP 503 for both the ZIP and the official
+documentation page. No validated water release was produced or published.
+
+Resume when the authoritative source is reachable, or provide a previously
+verified OSMCoastline WGS84 ocean archive through the existing
+`prepare_walking.py --ocean-archive <path>` option. Do not omit ocean polygons:
+inland water alone cannot mask the Stockholm archipelago correctly.

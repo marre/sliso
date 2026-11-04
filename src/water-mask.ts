@@ -23,7 +23,7 @@ export class WaterMask {
   async apply(rgba:Uint8ClampedArray,width:number,height:number,bounds:[number,number,number,number]):Promise<void>{
     const m=this.manifest;
     if(!m)return;
-    if(m.format!=='sliso-water-bitmap-v1'||m.resolution!==512||!Number.isFinite(m.tileDegrees)||m.tileDegrees<=0)return;
+    if(m.format!=='sliso-water-bitmap-v1'||m.resolution!==512||!Number.isFinite(m.tileDegrees)||m.tileDegrees<=0){rgba.fill(0);return;}
     const key=JSON.stringify([width,height,bounds,m]);
     if(this.cached?.key!==key){
       const [west,south,east,north]=bounds,d=m.tileDegrees,n=m.resolution;
@@ -39,7 +39,7 @@ export class WaterMask {
           if(!ref||ref.bytes!==n*n/8)throw new Error('Invalid water bitmap reference');
           tiles.set(name,await bitmap(ref));
         }));
-      }catch(error){console.warn('Water mask unavailable:',error);return;}
+      }catch(error){console.warn('Water mask unavailable; walking overlay hidden:',error);rgba.fill(0);return;}
       const pixels=new Uint8Array(width*height);
       const top=mercator(north),bottom=mercator(south);
       for(let row=0;row<height;row++){

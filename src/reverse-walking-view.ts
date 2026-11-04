@@ -33,7 +33,7 @@ export class ReverseWalkingView {
     if(data.id!==this.generation)return;
     if(data.type==='progress'){this.progress?.(data.done,data.total,0);this.status(`Gångvägar mot målet: ${data.done} av ${data.total} steg`);}
     if(data.type==='image'){
-     this.image??=new BandCanvas(this.map,new LngLatBounds(data.bounds));
+     this.image??=new BandCanvas(this.map,new LngLatBounds(data.bounds),manifest.waterMask);
      this.image.image(data.width,data.height,new Uint8ClampedArray(data.pixels),settings.maxMinutes);
      this.status(data.done?'Gångvägar mot målet · kartlagda vägar med ungefärlig visningsbredd.':'Gångvägar mot målet uppdateras…');
     }

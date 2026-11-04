@@ -1,0 +1,9 @@
+{
+  "url": "https://www.osmdata.org/download/water-polygons-split-4326.zip",
+  "sha256": "582de9c85a4cebd91fe35ac7b7e7455cd66b5511797c2da449593d6fe8046392",
+  "bytes": 907073989,
+  "upstream": "https://osmdata.openstreetmap.de/download/water-polygons-split-4326.zip",
+  "mirror": "Unofficial North America mirror, explicitly selected for this build",
+  "lastModified": "2026-11-03T03:47:26Z",
+  "license": "ODbL-1.0"
+}

@@ -4,17 +4,20 @@ Requires osmium-tool, GDAL/ogr2ogr, shapely and an OSM extract already pinned
 in data/walking-index.source.json. Ocean download is opt-in and cacheable.
 """
 import argparse
+import hashlib
+import json
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-OCEAN_URL='https://osmdata.openstreetmap.de/download/water-polygons-split-4326.zip'
+OCEAN_SOURCE=Path(__file__).resolve().parents[1]/'data/ocean-source.json'
 
 def run(*args):
     subprocess.run([str(a) for a in args],check=True)
 
 def build(output,cache,bounds,ocean_archive=None,pbf=None):
+    source=json.loads(OCEAN_SOURCE.read_text())
     west,south,east,north=bounds
     if not (-180<=west<east<=180 and -90<=south<north<=90):
         raise ValueError('Invalid bounding box')
@@ -39,11 +42,17 @@ def build(output,cache,bounds,ocean_archive=None,pbf=None):
                 print('Downloading OSMCoastline ocean polygons (may be large)',flush=True)
                 part=ocean_archive.with_suffix('.zip.part')
                 run('curl','--fail','--location','--show-error','--retry','3','--connect-timeout','30',
-                    '--continue-at','-','--output',part,OCEAN_URL)
+                    '--continue-at','-','--output',part,source['url'])
                 import zipfile
                 if not zipfile.is_zipfile(part):
                     raise ValueError('OSMCoastline download is not a ZIP archive')
                 part.replace(ocean_archive)
+        with Path(ocean_archive).open('rb') as stream:
+            actual=hashlib.file_digest(stream,'sha256').hexdigest()
+        if actual!=source['sha256'] or Path(ocean_archive).stat().st_size!=source['bytes']:
+            raise ValueError('Ocean archive differs from pinned source; review a new snapshot before updating the pin')
+        Path(output).parent.mkdir(parents=True,exist_ok=True)
+        (Path(output).parent/'ocean-source.json').write_text(json.dumps(source,indent=2)+'\n')
         ocean=root/'ocean.geojson'
         # The OSMCoastline ZIP contains a shapefile within a directory.
         # GDAL cannot necessarily infer a datasource from the ZIP root.
@@ -59,7 +68,7 @@ def build(output,cache,bounds,ocean_archive=None,pbf=None):
             '-clipsrc',west,south,east,north,'-nlt','PROMOTE_TO_MULTI')
         run(sys.executable,'scripts/export_water_mask.py','--geojson',inland,'--ocean-geojson',ocean,'--output',output)
         run(sys.executable,'scripts/water_bitmap.py','--source',output,'--output',Path(output).parent/'water-bitmap')
-        print('Water tiles prepared. Set VITE_WATER_TILES_URL=/water-tiles when deploying.',flush=True)
+        print('Water tiles prepared for the versioned data release.',flush=True)
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
