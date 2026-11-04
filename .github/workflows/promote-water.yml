@@ -32,4 +32,4 @@ jobs:
           assert r['sha256']=='f0da352fd2d7c25b98c9c7bcdbbd5c789003479e5250233914d2525e8c99b64e'
           assert r['features']['waterMask'] is True
           PY
-          gh release upload data-sl-50332a83c383a786d3f3 .data-build/sliso-data.zip
+          gh release create data-sl-50332a83c383a786d3f3 .data-build/sliso-data.zip --target "$GITHUB_SHA" --latest=false --title 'sliso data sl-50332a83c383a786d3f3' --notes 'Validated traffic and walking data with 96 water-mask tiles. CC0 / ODbL; mirror source pinned by SHA-256.' 
