@@ -1,15 +1,15 @@
 {
   "schema": 1,
-  "version": "sl-cfc7fb06007f3f067714",
+  "version": "sl-50332a83c383a786d3f3",
   "sourceVersion": "2026-11-04",
   "validFrom": "2026-11-04",
   "validTo": "2026-11-11",
-  "url": "https://github.com/marre/sliso/releases/download/data-sl-cfc7fb06007f3f067714/sliso-data.zip",
-  "sha256": "38e4e552d831f5981a3dcda0a209a7ee0db1f7c4714985c8e0b9da7a31a6d466",
-  "bytes": 770278629,
-  "unpackedBytes": 1095224098,
+  "url": "https://github.com/marre/sliso/releases/download/data-sl-50332a83c383a786d3f3/sliso-data.zip",
+  "sha256": "f0da352fd2d7c25b98c9c7bcdbbd5c789003479e5250233914d2525e8c99b64e",
+  "bytes": 770766403,
+  "unpackedBytes": 1101532575,
   "features": {
-    "waterMask": false,
+    "waterMask": true,
     "footpaths": true,
     "walkingAreas": true,
     "walkingClosure": true
