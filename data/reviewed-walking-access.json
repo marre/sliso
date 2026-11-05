@@ -5,14 +5,98 @@
     {
       "id": "arlanda-terminal-4-skycity",
       "reviewedOn": "2026-10-21",
-      "from": {"id": "9022001057310001", "name": "Arlanda terminal 4", "lat": 59.647775, "lon": 17.928574},
-      "to": {"id": "9022001057342001", "name": "Sky City", "lat": 59.648944, "lon": 17.930153},
+      "from": {
+        "id": "9022001057310001",
+        "name": "Arlanda terminal 4",
+        "lat": 59.647775,
+        "lon": 17.928574
+      },
+      "to": {
+        "id": "9022001057342001",
+        "name": "Sky City",
+        "lat": 59.648944,
+        "lon": 17.930153
+      },
       "seconds": 360,
       "metres": 400,
       "bidirectional": true,
       "source": "https://www.swedavia.com/contentassets/333ee1bb4b644015a92dc5cb2c8d1b7f/arlanda-airport-oversiktskarta-arn.pdf",
       "via": "Public terminal connection between the former Terminal 4 / current Terminal 5 C-gate hall and SkyCity; use public entrances and the terminal corridor, not the restricted airport carriageways or construction bridges.",
       "estimate": "Swedavia overview marks 4 minutes between the former Terminal 4 hall and SkyCity. Allow 2 additional minutes for bus-stop access: 6 minutes total, approximately 400 metres. No airport rail-platform access is inferred."
+    },
+    {
+      "id": "zinkensdamm-east-ringvagen",
+      "reviewedOn": "2026-11-05",
+      "from": {
+        "id": "9022001010655001",
+        "name": "Zinkensdamm",
+        "lat": 59.317454,
+        "lon": 18.051466
+      },
+      "to": {
+        "id": "9022001010971001",
+        "name": "Ringvägen",
+        "lat": 59.318388,
+        "lon": 18.049971
+      },
+      "seconds": 210,
+      "metres": 250,
+      "bidirectional": true,
+      "source": "https://www.openstreetmap.org/node/675633196",
+      "via": "Public pedestrian paths and mapped crossings from Zinkensdamm bus stop to the west-side Ringvägen sidewalk (OSM way 1027347480), then access to Ringvägen bus pole 675633196. The pole lies between this sidewalk and carriageway 151083834; no metro platform or carriageway shortcut is inferred.",
+      "estimate": "Published pedestrian graph sl-50332a83c383a786d3f3 provides approximately 203 m to the sidewalk beside the timetable point. Allow endpoint displacement and pole access, rounded conservatively to 250 m and 210 s. Whole connection remains a reviewed estimate, not native OSM geometry.",
+      "evidence": [
+        "https://www.openstreetmap.org/way/1027347480",
+        "https://www.openstreetmap.org/way/151083834"
+      ]
+    },
+    {
+      "id": "zinkensdamm-west-ringvagen",
+      "reviewedOn": "2026-11-05",
+      "from": {
+        "id": "9022001010655002",
+        "name": "Zinkensdamm",
+        "lat": 59.317312,
+        "lon": 18.04976
+      },
+      "to": {
+        "id": "9022001010971001",
+        "name": "Ringvägen",
+        "lat": 59.318388,
+        "lon": 18.049971
+      },
+      "seconds": 165,
+      "metres": 180,
+      "bidirectional": true,
+      "source": "https://www.openstreetmap.org/node/675633196",
+      "via": "Public pedestrian paths and mapped crossings from Zinkensdamm bus stop to the west-side Ringvägen sidewalk (OSM way 1027347480), then access to Ringvägen bus pole 675633196. The pole lies between this sidewalk and carriageway 151083834; no metro platform or carriageway shortcut is inferred.",
+      "estimate": "Published pedestrian graph sl-50332a83c383a786d3f3 provides approximately 141 m to the sidewalk beside the timetable point. Allow endpoint displacement and pole access, rounded conservatively to 180 m and 165 s. Whole connection remains a reviewed estimate, not native OSM geometry.",
+      "evidence": [
+        "https://www.openstreetmap.org/way/1027347480",
+        "https://www.openstreetmap.org/way/151083834"
+      ]
+    },
+    {
+      "id": "medborgarplatsen-b-bjorns-tradgard-b",
+      "reviewedOn": "2026-11-05",
+      "from": {
+        "id": "9022001010130001",
+        "name": "Medborgarplatsen",
+        "lat": 59.31521,
+        "lon": 18.072941
+      },
+      "to": {
+        "id": "9022001010410001",
+        "name": "Björns trädgård",
+        "lat": 59.315202,
+        "lon": 18.072948
+      },
+      "seconds": 30,
+      "metres": 10,
+      "bidirectional": true,
+      "source": "https://www.openstreetmap.org/node/719629885",
+      "via": "Two timetable identities for the same surface bus boarding location, platform B. OSM node 719629885 identifies Björns trädgård, local_ref B, SL ref 10410. This does not connect any underground Medborgarplatsen platform.",
+      "estimate": "Timetable coordinates are less than 1 m apart and both specify platform B. Allow 10 m and 30 s for local repositioning; retain as an estimated identity connection."
     }
   ]
 }

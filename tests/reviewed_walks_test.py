@@ -48,3 +48,19 @@ class ReviewedAccessTests(unittest.TestCase):
         self.assertEqual(self.data['edges'][0],original)
         self.assertEqual(len(self.data['edges']),2)
         self.assertEqual(self.data['edges'][1]['from'],'a')
+
+    def test_reviewed_sodermalm_connections_keep_costs_identity_and_staleness_guards(self):
+        import json
+        from reviewed_walks import FILE
+        document=json.loads(FILE.read_text())
+        links=[l for l in document['links'] if l['id'] in {'zinkensdamm-east-ringvagen','zinkensdamm-west-ringvagen','medborgarplatsen-b-bjorns-tradgard-b'}]
+        self.assertEqual(len(links),3)
+        stops=list({s['id']:s for l in links for s in (l['from'],l['to'])}.values())
+        data=dict(version='fixture',maxMinutes=30,speedKmh=4.8,stops=[],edges=[])
+        refresh_reviewed_walks(data,stops,dict(schema=1,links=links))
+        self.assertEqual(len(validate_walks(data,stops)[0]),6)
+        self.assertEqual(sorted(e['seconds'] for e in data['edges']),[30,30,165,165,210,210])
+        self.assertTrue(all(e['source'].startswith(PREFIX) for e in data['edges']))
+        moved=copy.deepcopy(stops);moved[0]['lat']+=.0001
+        with self.assertRaisesRegex(ValueError,'Stale'):
+            refresh_reviewed_walks(data,moved,dict(schema=1,links=links))
