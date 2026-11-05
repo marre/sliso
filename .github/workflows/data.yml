@@ -132,6 +132,10 @@ jobs:
           if test "$REQUEST_WATER" = true || test -f .data-build/prepared-walking/water-bitmap/index.json || python -c "import json,sys; sys.exit(0 if json.load(open('data/release.json')).get('features',{}).get('waterMask') else 1)"; then
             water=true
           fi
+          # A cache can be complete for an older release but lack required water data.
+          if test "$water" = true && ! test -f .data-build/prepared-walking/water-bitmap/index.json; then
+            rebuild=true
+          fi
           echo "rebuild=$rebuild" >> "$GITHUB_OUTPUT"
           echo "water=$water" >> "$GITHUB_OUTPUT"
       - name: Require walking rebuild when water generation is requested
