@@ -119,13 +119,13 @@ test('destination selection stays fixed while opening details and changes origin
  const marker=page.getByRole('button',{name:'Universitetet · Testläge A',exact:true});
  if(info.project.name==='desktop'){
   await marker.hover({force:true});
-  await expect(page.locator('#journey-panel')).toBeHidden();
-  const bounds=await marker.boundingBox();
-  await page.mouse.click(bounds!.x+bounds!.width/2,bounds!.y+bounds!.height/2);
+  await expect(page.locator('#journey-panel')).toBeVisible();
  }else await marker.press('Enter');
  await expect(page.locator('#journey-title')).toHaveText('Universitetet');
  await expect(page.locator('#journey-content')).toBeHidden();
- await page.mouse.move(600,400,{steps:20});
+ const details=await page.locator('#journey-expand').boundingBox();
+ await page.mouse.move(details!.x+details!.width/2,details!.y+details!.height/2,{steps:40});
+ await expect(page.locator('#journey-title')).toHaveText('Universitetet');
  await page.locator('#journey-expand').click();
  await page.waitForTimeout(600);
  await expect(page.locator('#journey-title')).toHaveText('Universitetet');

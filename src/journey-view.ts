@@ -21,6 +21,8 @@ export class JourneyView {
   private active: number | null = null;
   private pinned: number | null = null;
   private cutoff=Infinity;
+  private pointer?:{x:number;y:number};
+  private approaching=false;
   private point?:PointJourney;
   get isPinned(){return this.pinned!==null;}
   private timer?: ReturnType<typeof setTimeout>;
@@ -31,7 +33,7 @@ export class JourneyView {
     map.addLayer({id:'journey-halo',type:'line',source:'journey',filter:['==',['geometry-type'],'LineString'],layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#fff','line-width':9,'line-opacity':.95}});
     for(const kind of ['transit','walk'])map.addLayer({id:'journey-'+kind,type:'line',source:'journey',filter:['all',['==',['geometry-type'],'LineString'],['==',['get','kind'],kind]],layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','color'],'line-width':4,...(kind==='walk'?{'line-dasharray':[1.25,1.75]}:{})}});
     map.addLayer({id:'journey-stops',type:'circle',source:'journey',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':['get','radius'],'circle-color':['get','fill'],'circle-stroke-color':['get','color'],'circle-stroke-width':['get','weight']}});
-    this.panel.addEventListener('mouseenter', () => clearTimeout(this.timer));
+    this.panel.addEventListener('mouseenter', () => {clearTimeout(this.timer);this.panel.dispatchEvent(new Event('journeyinteract'));});
     this.panel.addEventListener('mouseleave', () => this.leave());
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && !this.panel.hidden && !document.querySelector('dialog[open]')) {
@@ -55,9 +57,21 @@ export class JourneyView {
     clearTimeout(this.timer); this.pinned = null; this.hide();this.panel.dispatchEvent(new Event('journeyclose'));
   }
 
+  /** Keep the preview stable while the pointer travels towards its controls. */
+  protectsPreview(event:MouseEvent) {
+    const next={x:event.clientX,y:event.clientY},previous=this.pointer;
+    if(previous?.x===next.x&&previous.y===next.y)return this.approaching;
+    this.pointer=next;
+    const rect=this.panel.getBoundingClientRect();
+    const distance=(p:{x:number;y:number})=>Math.hypot(Math.max(rect.left-p.x,0,p.x-rect.right),Math.max(rect.top-p.y,0,p.y-rect.bottom));
+    this.approaching=!this.panel.hidden&&!!previous&&distance(next)<distance(previous);
+    if(this.approaching)clearTimeout(this.timer);
+    return this.approaching;
+  }
+
   hover(index: number) {
     clearTimeout(this.timer);
-    if (this.pinned === null) this.show(index);
+    if (this.pinned === null && !this.panel.matches(':hover')) this.show(index);
   }
 
   pin(index: number, focus = false) {
@@ -67,14 +81,14 @@ export class JourneyView {
 
   showPoint(point:PointJourney,pin=false){
     clearTimeout(this.timer);
-    if(this.pinned!==null&&!pin)return;
+    if(!pin&&(this.pinned!==null||this.panel.matches(':hover')))return;
     if(pin)this.pinned=this.stops.length;
     this.show(this.stops.length,point);
   }
 
   leave() {
     clearTimeout(this.timer);
-    if (this.pinned === null) this.timer = setTimeout(() => this.hide(), 180);
+    if (this.pinned === null && !this.approaching) this.timer = setTimeout(() => this.hide(), 700);
   }
 
   private hide() {
@@ -82,7 +96,7 @@ export class JourneyView {
       const value = this.result.values[this.active];
       if (value) this.markers[this.active]?.setStyle({ color: '#fff', fillColor: colorFor(value.seconds, this.settings.maxMinutes), weight: 2, radius: 7 });
     }
-    this.active = null; this.point=undefined; this.routeData.features=[];(this.map.getSource('journey') as GeoJSONSource).setData(this.routeData); this.panel.hidden = true; this.panel.classList.remove('journey-expanded');
+    this.active = null; this.approaching=false; this.point=undefined; this.routeData.features=[];(this.map.getSource('journey') as GeoJSONSource).setData(this.routeData); this.panel.hidden = true; this.panel.classList.remove('journey-expanded');
     this.panel.closest('.map-section')!.classList.remove('journey-open');
   }
 
@@ -128,6 +142,7 @@ export class JourneyView {
     this.panel.dispatchEvent(new Event('journeyopen'));
     this.panel.querySelector<HTMLButtonElement>('#journey-expand')!.onclick=()=>{
       const open=this.panel.classList.toggle('journey-expanded');
+      if(open){this.pinned=index;this.panel.querySelector('#journey-pin')!.setAttribute('aria-pressed','true');this.panel.querySelector('#journey-pin')!.textContent='Fäst ✓';this.panel.dispatchEvent(new Event('journeyinteract'));}
       const button=this.panel.querySelector<HTMLButtonElement>('#journey-expand')!;
       button.setAttribute('aria-expanded',String(open));
       button.querySelector('span')!.textContent=open?'Dölj detaljer':'Visa detaljer';

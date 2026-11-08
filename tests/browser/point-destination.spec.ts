@@ -19,6 +19,7 @@ async function inspect(page:import('@playwright/test').Page,point:{x:number;y:nu
 }
 test('arbitrary destination shows walk–transit–walk, pins and can become the next origin',async({page},info)=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await init(page);const point=await position(page);
+ if(info.project.name==='desktop'){await page.mouse.move(point.x,point.y);await expect(page.locator('#journey-title')).toHaveText('Vald målpunkt',{timeout:15000});}
  await page.mouse.click(point.x,point.y);
  await expect(page.locator('#journey-title')).toHaveText('Vald målpunkt',{timeout:15000});
  await expect(page.locator('#journey-panel')).toContainText('Vald kartpunkt');await expect(page.locator('#journey-panel')).toContainText('Slutgång på kartlagd väg');
@@ -42,4 +43,16 @@ test('double clicking a result map zooms without pinning a destination',async({p
  await page.mouse.dblclick(point.x,point.y,{delay:100});
  await expect.poll(()=>page.evaluate(()=>(window as any).slisoMap.getZoom())).toBeGreaterThan(zoom);
  await page.waitForTimeout(550);await expect(page.locator('#journey-pin[aria-pressed=true]')).toHaveCount(0);
+});
+
+test('hover updates the destination again when the pointer settles elsewhere on the map',async({page},info)=>{
+ test.skip(info.project.name!=='desktop','Mouse hover');
+ await init(page);const point=await position(page);
+ await page.mouse.move(point.x,point.y);
+ await expect(page.locator('#journey-title')).toHaveText('Vald målpunkt',{timeout:15000});
+ const other=await position(page,59.34,18.0592);
+ await page.mouse.move(other.x+30,other.y+10);
+ await expect(page.locator('#point-status')).toContainText('Ingen känd gångresa',{timeout:15000});
+ await expect(page.locator('#stop-search')).toHaveValue('Vald kartpunkt');
+ await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
 });

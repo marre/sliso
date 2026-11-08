@@ -255,7 +255,7 @@ map.on('click',(event:MapMouseEvent)=>{
     else setPointStart({lat:event.lngLat.lat,lon:event.lngLat.lng});
   },450);
 });
-// Result journeys are selected deliberately; crossing the map never replaces the card.
+map.on('mousemove','stops',event=>{if(journeyView.protectsPreview(event.originalEvent))return;const index=Number(event.features?.[0]?.properties.index);if(Number.isInteger(index)){pointDestinations.pause();if(matchMedia('(hover: hover)').matches)journeyView.hover(index);}});
 map.on('mouseleave','stops',()=>journeyView.leave());
 map.on('contextmenu','stops',event=>{const index=Number(event.features?.[0]?.properties.index);if(result?.values[index]){closePopup();journeyView.pin(index);}});
 for(const type of ['dblclick','movestart','contextmenu'] as const)map.on(type,cancelOriginClick);
