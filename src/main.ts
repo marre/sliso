@@ -245,12 +245,6 @@ map.on('click',(event:MapMouseEvent)=>{
   const index=target?Number(target.getAttribute('data-stop-index')):hitStop(map,event.point);
   if(!manifest||(index===undefined&&!manifest.footpaths))return;
   originClick=setTimeout(()=>{
-    if(result){
-      closePopup();pointDestinations.pause();
-      if(index!==undefined){if(result.values[index])journeyView.pin(index);else{journeyView.close();popup(index);}}
-      else pointDestinations.inspect(event.lngLat);
-      return;
-    }
     if(index!==undefined&&isMapStop(stops[index]))setStart(index,true);
     else setPointStart({lat:event.lngLat.lat,lon:event.lngLat.lng});
   },450);

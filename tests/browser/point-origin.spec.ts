@@ -32,7 +32,7 @@ async function drag(page:import('@playwright/test').Page,p:{x:number;y:number},m
  for(let i=1;i<=8;i++){await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+i*8,y:p.y+i*3}]});await page.waitForTimeout(25);}
  await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await touch.detach();
 }
-test('map clicks inspect results and explicit journey actions replace the origin; double clicks and dragging only navigate',async({page},info)=>{
+test('map clicks replace the origin directly; double clicks and dragging only navigate',async({page},info)=>{
  await mapSetup(page);const mobile=info.project.name==='mobile';if(mobile)await page.locator('#mobile-close-search').click();
  let p=await position(page),zoom=await page.evaluate(()=>(window as any).testMap.getZoom());
  await page.mouse.dblclick(p.x,p.y,{delay:100});await expect.poll(()=>page.evaluate(()=>(window as any).testMap.getZoom())).toBeGreaterThan(zoom);
@@ -41,14 +41,14 @@ test('map clicks inspect results and explicit journey actions replace the origin
  await expect.poll(()=>page.evaluate(()=>(window as any).testMap.getCenter().lng)).not.toBe(center);await page.waitForTimeout(550);expect(await page.evaluate(()=>(window as any).searches.length)).toBe(0);
  p=await position(page);await page.mouse.click(p.x,p.y);await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
  expect(await page.evaluate(()=>(window as any).searches.length)).toBe(1);await expect(page.locator('#stop-search')).toHaveValue('Vald kartpunkt');
- p=await position(page,59.3319,18.0592);await page.mouse.click(p.x,p.y);await expect(page.locator('#journey-panel')).toBeVisible();await page.locator('#journey-expand').click();await page.locator('#journey-start').click();await expect.poll(()=>page.evaluate(()=>(window as any).searches.length)).toBe(2);await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
+ p=await position(page,59.3319,18.0592);await page.mouse.click(p.x,p.y);await expect.poll(()=>page.evaluate(()=>(window as any).searches.length)).toBe(2);await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
  const source=await page.evaluate(()=>(window as any).searches.at(-1));expect(source.lat).toBeCloseTo(59.3319,4);expect(source.lon).toBeCloseTo(18.0592,4);
  if(mobile)await expect(page.locator('.panel')).toBeHidden();
  zoom=await page.evaluate(()=>(window as any).testMap.getZoom());await page.mouse.dblclick(p.x+45,p.y,{delay:100});await expect.poll(()=>page.evaluate(()=>(window as any).testMap.getZoom())).toBeGreaterThan(zoom);
  await page.waitForTimeout(550);expect(await page.evaluate(()=>(window as any).searches.length)).toBe(2);
  p=await position(page);await drag(page,p,mobile);await page.waitForTimeout(550);expect(await page.evaluate(()=>(window as any).searches.length)).toBe(2);
  // A station marker follows the same click/zoom contract as the map background.
- p=await position(page,59.331,18.0592);await page.mouse.click(p.x,p.y);await expect(page.locator('#journey-panel')).toBeVisible();await page.locator('#journey-expand').click();await page.locator('#journey-start').click();await expect.poll(()=>page.evaluate(()=>(window as any).searches.length)).toBe(3);await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
+ p=await position(page,59.331,18.0592);await page.mouse.click(p.x,p.y);await expect.poll(()=>page.evaluate(()=>(window as any).searches.length)).toBe(3);await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
  expect(await page.evaluate(()=>(window as any).searches.at(-1).stop)).toBe('demo-2');
  await position(page,59.331,18.0592);
  const pin=page.locator('.start-pin');const box=await pin.boundingBox();

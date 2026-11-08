@@ -54,7 +54,6 @@ export class PointDestinations {
   this.cancel();this.view.leave();
   this.timer=setTimeout(()=>this.query(e.lngLat,false),220);
  }
- inspect(point:LngLat){this.query(point,true);}
  private query(point:LngLat,pin:boolean){
   this.cancel();if(!this.available())return;
   if(pin)this.view.close();

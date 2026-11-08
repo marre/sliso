@@ -20,7 +20,7 @@ async function inspect(page:import('@playwright/test').Page,point:{x:number;y:nu
 test('arbitrary destination shows walk–transit–walk, pins and can become the next origin',async({page},info)=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await init(page);const point=await position(page);
  if(info.project.name==='desktop'){await page.mouse.move(point.x,point.y);await expect(page.locator('#journey-title')).toHaveText('Vald målpunkt',{timeout:15000});}
- await page.mouse.click(point.x,point.y);
+ await inspect(page,point,info.project.name==='mobile');
  await expect(page.locator('#journey-title')).toHaveText('Vald målpunkt',{timeout:15000});
  await expect(page.locator('#journey-panel')).toContainText('Vald kartpunkt');await expect(page.locator('#journey-panel')).toContainText('Slutgång på kartlagd väg');
  const labels=await page.locator('.journey-leg-head strong').allTextContents();expect(labels).toHaveLength(3);expect(labels[0]).toBe('Gång');expect(labels[1]).toContain('Tunnelbana');expect(labels[2]).toBe('Gång');
