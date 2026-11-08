@@ -113,23 +113,25 @@ test('driver-coordinated stops are routable and show a rider notice',async({page
  await expect(page.locator('#journey-panel')).toContainText('meddela föraren');
 });
 
-test('destination route previews on hover, pins with keyboard, and recalculates on origin change',async({page},info)=>{
+test('destination selection stays fixed while opening details and changes origin only explicitly',async({page},info)=>{
  await init(page);await select(page);await page.locator('#calculate').click();
  await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
  const marker=page.getByRole('button',{name:'Universitetet · Testläge A',exact:true});
  if(info.project.name==='desktop'){
   await marker.hover({force:true});
-  await expect(page.locator('#journey-panel')).toBeVisible();
-  await expect(page.locator('#journey-panel')).toContainText('Tunnelbana');
-  await expect.poll(async()=>(await journeyLines(page)).length).toBeGreaterThan(0);
-  await page.mouse.move(20,10);
   await expect(page.locator('#journey-panel')).toBeHidden();
-  await marker.hover({force:true});
-  await expect(page.locator('#journey-content')).toBeHidden();
-  await page.locator('#journey-expand').click();
-  await expect(page.locator('#journey-expand')).toHaveAttribute('aria-expanded','true');
-  await page.locator('#journey-pin').click();
- }else {await marker.press('Enter');await page.locator('#journey-expand').click();}
+  const bounds=await marker.boundingBox();
+  await page.mouse.click(bounds!.x+bounds!.width/2,bounds!.y+bounds!.height/2);
+ }else await marker.press('Enter');
+ await expect(page.locator('#journey-title')).toHaveText('Universitetet');
+ await expect(page.locator('#journey-content')).toBeHidden();
+ await page.mouse.move(600,400,{steps:20});
+ await page.locator('#journey-expand').click();
+ await page.waitForTimeout(600);
+ await expect(page.locator('#journey-title')).toHaveText('Universitetet');
+ await expect(page.locator('#stop-search')).toHaveValue('T-Centralen');
+ await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
+ await expect(page.locator('#journey-expand')).toHaveAttribute('aria-expanded','true');
  await expect(page.locator('#journey-pin')).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('#journey-panel')).toContainText('Avgång');
  await expect(page.locator('#journey-panel')).toContainText('Ankomst');

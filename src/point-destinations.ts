@@ -3,12 +3,12 @@ import {hitStop} from './map-stops';
 import type {JourneyView} from './journey-view';
 import type {Manifest,SearchResult,Settings,Stop} from './core/types';
 
-/** One persistent worker per search; pointer changes invalidate stale previews. */
+/** One persistent worker per search; destination changes invalidate stale previews. */
 export class PointDestinations {
- private arrive=false;private worker?:Worker;private id=0;private timer?:ReturnType<typeof setTimeout>;private cutoff=0;private inspected=false;private pinPending=false;private holdTimer?:ReturnType<typeof setTimeout>;
+ private arrive=false;private worker?:Worker;private id=0;private cutoff=0;private inspected=false;private pinPending=false;private holdTimer?:ReturnType<typeof setTimeout>;
  constructor(private map:Map,private view:JourneyView,private status:HTMLElement){
   document.querySelector('#journey-panel')!.addEventListener('journeyclose',()=>this.cancel());
-  map.on('mousemove',e=>this.move(e));
+
   const container=map.getContainer();let down:{x:number;y:number}|undefined;
   const cancelHold=()=>{clearTimeout(this.holdTimer);down=undefined;};
   container.addEventListener('pointerdown',e=>{
@@ -37,12 +37,7 @@ export class PointDestinations {
  }
  private available(){return !!this.worker;}
  private onStop(e:MapMouseEvent){return !!(e.originalEvent?.target as Element|null)?.closest?.('.map-stop')||hitStop(this.map,e.point)!==undefined;}
- private move(e:MapMouseEvent){
-  if(this.pinPending||!this.available()||this.view.isPinned||!matchMedia('(hover: hover)').matches)return;
-  if(this.onStop(e)){this.cancel();return;}
-  this.cancel();this.view.leave();
-  this.timer=setTimeout(()=>this.query(e.lngLat,false),220);
- }
+ inspect(point:LngLat){this.query(point,true);}
  private query(point:LngLat,pin:boolean){
   this.cancel();if(!this.available())return;
   if(pin)this.view.close();
@@ -57,7 +52,7 @@ export class PointDestinations {
   };
   this.worker!.postMessage({type:'query',id,lat:point.lat,lon:point.lng,cutoff:this.cutoff});
  }
- private cancel(){this.pinPending=false;clearTimeout(this.timer);this.id++;this.worker?.postMessage({type:'cancel'});this.status.hidden=true;}
+ private cancel(){this.pinPending=false;this.id++;this.worker?.postMessage({type:'cancel'});this.status.hidden=true;}
  setData(result:SearchResult,settings:Settings,manifest:Manifest,stops:Stop[]){
   this.reset();this.arrive=settings.direction==='arrive';this.cutoff=settings.maxMinutes;
   if(!manifest.footpaths||!result.destinationSources)return;

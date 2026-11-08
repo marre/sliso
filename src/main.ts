@@ -244,9 +244,18 @@ map.on('click',(event:MapMouseEvent)=>{
   const target=(event.originalEvent?.target as Element|null)?.closest?.('[data-stop-index]');
   const index=target?Number(target.getAttribute('data-stop-index')):hitStop(map,event.point);
   if(!manifest||(index===undefined&&!manifest.footpaths))return;
-  originClick=setTimeout(()=>{if(index!==undefined&&isMapStop(stops[index]))setStart(index,true);else setPointStart({lat:event.lngLat.lat,lon:event.lngLat.lng});},450);
+  originClick=setTimeout(()=>{
+    if(result){
+      closePopup();pointDestinations.pause();
+      if(index!==undefined){if(result.values[index])journeyView.pin(index);else{journeyView.close();popup(index);}}
+      else pointDestinations.inspect(event.lngLat);
+      return;
+    }
+    if(index!==undefined&&isMapStop(stops[index]))setStart(index,true);
+    else setPointStart({lat:event.lngLat.lat,lon:event.lngLat.lng});
+  },450);
 });
-map.on('mousemove','stops',event=>{const index=Number(event.features?.[0]?.properties.index);if(Number.isInteger(index)){pointDestinations.pause();if(matchMedia('(hover: hover)').matches)journeyView.hover(index);}});
+// Result journeys are selected deliberately; crossing the map never replaces the card.
 map.on('mouseleave','stops',()=>journeyView.leave());
 map.on('contextmenu','stops',event=>{const index=Number(event.features?.[0]?.properties.index);if(result?.values[index]){closePopup();journeyView.pin(index);}});
 for(const type of ['dblclick','movestart','contextmenu'] as const)map.on(type,cancelOriginClick);
