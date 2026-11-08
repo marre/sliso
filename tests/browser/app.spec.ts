@@ -24,7 +24,7 @@ test('local stop search, worker result, filters, share and marker detail',async(
  await page.locator('#calculate').click();
  await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete',{timeout:20000});
  await expect(page.locator('#status')).toContainText('Färdigt.');
- await expect(page.locator('.time-note')).toContainText('Initial väntan räknas inte');
+ await expect(page.locator('.time-note')).toContainText('Restid utan väntan före första avgången');
  await page.screenshot({path:`test-results/${test.info().project.name}-result.png`,fullPage:true});
  // A result click is a stop value, and its explicit action changes the origin.
  const marker=page.getByRole('button',{name:'Universitetet · Testläge A',exact:true});
@@ -125,6 +125,9 @@ test('destination route previews on hover, pins with keyboard, and recalculates 
   await page.mouse.move(20,10);
   await expect(page.locator('#journey-panel')).toBeHidden();
   await marker.hover({force:true});
+  await expect(page.locator('#journey-content')).toBeHidden();
+  await page.locator('#journey-expand').click();
+  await expect(page.locator('#journey-expand')).toHaveAttribute('aria-expanded','true');
   await page.locator('#journey-pin').click();
  }else {await marker.press('Enter');await page.locator('#journey-expand').click();}
  await expect(page.locator('#journey-pin')).toHaveAttribute('aria-pressed','true');

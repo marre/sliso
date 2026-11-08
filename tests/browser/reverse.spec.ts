@@ -10,11 +10,11 @@ test('arrive-by mode selects a destination, shows chronological journeys, shares
  await page.locator('#direction').selectOption('arrive');await expect(page.locator('#place-label')).toHaveText('Vart vill du komma?');await expect(page.locator('#time-label')).toHaveText('Senast framme');await expect(page.locator('#window')).toBeHidden();
  await page.locator('#stop-search').fill('T-Centralen');await page.locator('#stop-search').press('ArrowDown');await page.locator('#stop-search').press('Enter');await page.locator('#time').fill('09:00');await page.locator('#calculate').click();
  await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');await expect(page.locator('#status')).toContainText('kan nå målet');await expect(page.locator('#map-label')).toHaveText('TILL T-CENTRALEN');
- await page.getByRole('button',{name:'Slussen · Testläge A',exact:true}).press('Enter');await expect(page.locator('#journey-panel .eyebrow')).toHaveText('RESAN FRÅN');
+ await page.getByRole('button',{name:'Slussen · Testläge A',exact:true}).press('Enter');await expect(page.locator('#journey-panel .eyebrow')).toHaveText('FRÅN');
  const times=await page.locator('.journey-times time').evaluateAll(nodes=>nodes.map(n=>Date.parse(n.getAttribute('datetime')!)/1000));
  expect(times).toHaveLength(2);expect(times[0]).toBeLessThan(times[1]);expect(times[1]).toBeLessThanOrEqual(stockholmInstant(query.date,query.time));
- expect((await journeyLines(page,'transit')).length).toBeGreaterThan(0);
- if(test.info().project.name==='mobile')await page.locator('#journey-expand').click();
+ await expect.poll(async()=>(await journeyLines(page,'transit')).length).toBeGreaterThan(0);
+ await page.locator('#journey-expand').click();
  await page.screenshot({path:`test-results/${test.info().project.name}-arrive-by.png`,fullPage:true});
  await page.getByRole('button',{name:'Stäng resedetaljer'}).click();await page.locator('#share').click();expect(JSON.parse(decodeURIComponent(new URL(page.url()).hash.slice(3))).direction).toBe('arrive');
  await page.reload();await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');await expect(page.locator('#direction')).toHaveValue('arrive');
@@ -33,7 +33,7 @@ test('reverse point destination includes incoming walking layer and a walk–tra
  else {const cdp=await page.context().newCDPSession(page);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p]});await page.waitForTimeout(800);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();}
  await expect(page.locator('#journey-title')).toHaveText('Vald startpunkt',{timeout:15000});
  expect(await page.locator('.journey-leg-head strong').allTextContents()).toEqual(['Gång','Tunnelbana · 14','Gång']);
- expect(await journeyLines(page,'walk')).toHaveLength(2);await expect(page.locator('#journey-panel')).toContainText('Vald kartpunkt');
+ await expect.poll(()=>journeyLines(page,'walk')).toHaveLength(2);await expect(page.locator('#journey-panel')).toContainText('Vald kartpunkt');
  await page.getByRole('button',{name:'Stäng resedetaljer'}).click();await openPanel(page);await page.locator('#reset-search').click();await expect(page.locator('canvas.walking-raster')).toHaveCount(0);await expect(page.locator('#direction')).toHaveValue('arrive');expect(errors).toEqual([]);
 });
 

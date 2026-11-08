@@ -26,7 +26,7 @@ test('arbitrary destination shows walk–transit–walk, pins and can become the
  expect(await journeyLines(page,'walk')).toHaveLength(2);
  if(info.project.name==='desktop'){await inspect(page,point,false);await page.mouse.move(point.x+20,point.y+20);}
  await expect(page.locator('#journey-pin')).toContainText('Fäst ✓');
- if(info.project.name==='mobile')await page.locator('#journey-expand').click();
+ await page.locator('#journey-expand').click();
  await page.screenshot({path:`test-results/${info.project.name}-point-destination.png`,fullPage:true});
  await page.locator('#journey-start').click();await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');await expect(page.locator('#journey-panel')).toBeHidden();await expect(page.locator('#stop-search')).toHaveValue('Vald kartpunkt');expect(errors).toEqual([]);
 });

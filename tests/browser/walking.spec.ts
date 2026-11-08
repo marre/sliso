@@ -85,7 +85,7 @@ test('consecutive mapped and estimated walks form one labelled journey step', as
     view.pin(3);(window as any).cutoffJourney=view;
   });
   await expect(page.locator('#journey-panel')).toContainText('Gång · uppskattad');
-  await expect(page.locator('#journey-panel')).toContainText('samma namn inom 250 meter');
+  await expect(page.locator('#journey-panel')).toContainText('Uppskattad gång ingår');
   await expect(page.locator('#journey-panel')).toContainText('Gång totalt: 3 min · 240 m');
   await expect(page.locator('#journey-panel .journey-leg')).toHaveCount(1);
   await page.evaluate(()=>(window as any).cutoffJourney.setCutoff(2));

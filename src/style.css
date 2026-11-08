@@ -103,3 +103,31 @@
  .journey-panel.journey-expanded{max-height:min(58dvh,calc(100% - 160px))}.start-pin{pointer-events:none}
 }
 @media(max-width:1000px) and (max-height:500px){.maplibregl-ctrl-top-right{top:26px}}
+
+/* A shared summary-first hierarchy for search and journey details. */
+.panel>h1{font-size:36px;line-height:1.15;letter-spacing:-1.5px;margin:12px 0}
+.panel>.eyebrow{display:none}
+.panel>.intro{font-size:13px;line-height:1.5;margin-bottom:20px}
+.time-note,.hint{font-size:11px}
+.notice{font-size:11px;margin-bottom:16px}
+.summary-meta{font-size:10px}
+.journey-header h2{margin-top:0}
+.journey-expand{display:flex;align-items:center;gap:6px;border:0;padding:8px 0;min-height:44px;width:100%;text-align:left;background:transparent;font-size:12px;flex-wrap:wrap}
+.journey-expand strong{font-size:22px}
+.journey-expand span{margin-left:auto;font-size:12px;text-decoration:underline;text-underline-offset:3px}
+.journey-panel:not(.journey-expanded) .journey-scroll{display:none}
+.journey-overview{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:12px 0 4px}
+.journey-chip{display:inline-flex;align-items:center;gap:5px;background:#edf2e8;border-radius:6px;padding:5px 7px;font-size:12px;font-weight:600}
+.journey-chip .transport-icon{width:18px;height:18px}
+.journey-arrow{color:var(--muted)}
+.journey-header .journey-arrival{font-size:12px;color:var(--green)}
+.journey-header .journey-request{font-size:11px;color:#7b542c;margin-top:8px}
+.journey-panel:not(.journey-expanded) .journey-header p{display:block}
+.journey-explanation{margin:14px 0}
+.journey-explanation summary{padding:12px 0}
+.journey-header>button{min-width:44px;min-height:44px}
+.journey-summary{margin-bottom:12px}
+.journey-actions button{min-height:44px}
+@media(min-width:761px){.topbar{height:68px}main{height:calc(100dvh - 68px)}.panel{padding-top:22px}.map-tip{padding:12px 16px;bottom:96px}.map-tip>span{font-size:22px}}
+@media(max-width:760px),(max-width:1000px) and (max-height:500px) and (pointer:coarse){.journey-overview{margin-top:8px}.journey-expand strong{font-size:19px}.journey-chip{font-size:11px}.journey-header{padding:10px 12px}.journey-header h2{font-size:19px}}
+@media(max-width:760px),(max-width:1000px) and (max-height:500px) and (pointer:coarse){.journey-header{padding:8px 12px}.journey-overview{margin:4px 0 0}.journey-chip{padding:4px 7px}}

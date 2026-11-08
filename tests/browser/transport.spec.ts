@@ -10,14 +10,14 @@ test('transport filters and journeys show icons with route-specific colours on t
  for(const mode of ['bus','metro','rail','tram','boat'])await expect(page.locator(`[name=mode][value=${mode}]`)).toHaveAccessibleName(new RegExp({bus:'Buss',metro:'Tunnelbana',rail:'Pendeltåg',tram:'Spårvagn',boat:'Båt'}[mode]!));
  if(info.project.name==='mobile')await page.locator('#mobile-close-search').click();
  await page.getByRole('button',{name:'Universitetet · Testläge A',exact:true}).press('Enter');
- await expect(page.locator('.journey-step svg[data-transport=metro]').first()).toBeAttached();expect((await journeyLines(page,'transit'))[0].properties.color).toBe('#d71d24');
+ await expect(page.locator('.journey-step svg[data-transport=metro]').first()).toBeAttached();await expect.poll(async()=>(await journeyLines(page,'transit'))[0]?.properties.color).toBe('#d71d24');
  await page.getByRole('button',{name:'Alvik · Testläge A',exact:true}).press('Enter');
- expect((await journeyLines(page,'transit'))[0].properties.color).toBe('#008b43');
+ await expect.poll(async()=>(await journeyLines(page,'transit'))[0]?.properties.color).toBe('#008b43');
  const bus={...settings,stop:'demo-24',name:'Slussen',lat:59.3188,lon:18.073,modes:['bus']};
  await page.goto('/#s='+encodeURIComponent(JSON.stringify(bus)));await page.reload();await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
  await page.getByRole('button',{name:'Nacka strand · Testläge A',exact:true}).press('Enter');
- await expect(page.locator('.journey-step svg[data-transport=bus]').first()).toBeAttached();expect((await journeyLines(page,'transit'))[0].properties.color).toBe('#007db8');
+ await expect(page.locator('.journey-step svg[data-transport=bus]').first()).toBeAttached();await expect.poll(async()=>(await journeyLines(page,'transit'))[0]?.properties.color).toBe('#007db8');
  await expect(page.locator('.journey-leg').first()).toHaveCSS('--leg-color','#007db8');await expect(page.locator('#journey-panel')).toContainText('Buss · 474');
- if(info.project.name==='mobile')await page.locator('#journey-expand').click();
+ await page.locator('#journey-expand').click();
  await page.screenshot({path:`test-results/${info.project.name}-transport.png`});expect(errors).toEqual([]);
 });
