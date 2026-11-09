@@ -24,7 +24,7 @@ test('local stop search, worker result, filters, share and marker detail',async(
  await page.locator('#calculate').click();
  await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete',{timeout:20000});
  await expect(page.locator('#status')).toContainText('Färdigt.');
- await expect(page.locator('.time-note')).toContainText('Initial väntan räknas inte');
+ await expect(page.locator('.time-note')).toContainText('Restid utan väntan före första avgången');
  await page.screenshot({path:`test-results/${test.info().project.name}-result.png`,fullPage:true});
  // A result click is a stop value, and its explicit action changes the origin.
  const marker=page.getByRole('button',{name:'Universitetet · Testläge A',exact:true});
@@ -113,20 +113,32 @@ test('driver-coordinated stops are routable and show a rider notice',async({page
  await expect(page.locator('#journey-panel')).toContainText('meddela föraren');
 });
 
-test('destination route previews on hover, pins with keyboard, and recalculates on origin change',async({page},info)=>{
+test('destination selection stays fixed while opening details and changes origin only explicitly',async({page},info)=>{
  await init(page);await select(page);await page.locator('#calculate').click();
  await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
  const marker=page.getByRole('button',{name:'Universitetet · Testläge A',exact:true});
  if(info.project.name==='desktop'){
   await marker.hover({force:true});
   await expect(page.locator('#journey-panel')).toBeVisible();
-  await expect(page.locator('#journey-panel')).toContainText('Tunnelbana');
-  await expect.poll(async()=>(await journeyLines(page)).length).toBeGreaterThan(0);
-  await page.mouse.move(20,10);
-  await expect(page.locator('#journey-panel')).toBeHidden();
-  await marker.hover({force:true});
-  await page.locator('#journey-pin').click();
- }else {await marker.press('Enter');await page.locator('#journey-expand').click();}
+ }else await marker.press('Enter');
+ await expect(page.locator('#journey-title')).toHaveText('Universitetet');
+ await expect(page.locator('#journey-content')).toBeHidden();
+ const details=await page.locator('#journey-expand').boundingBox();
+ await page.mouse.move(details!.x+details!.width/2,details!.y+details!.height/2,{steps:40});
+ await expect(page.locator('#journey-title')).toHaveText('Universitetet');
+ await page.locator('#journey-expand').click();
+ await page.waitForTimeout(600);
+ await expect(page.locator('#journey-title')).toHaveText('Universitetet');
+ await expect(page.locator('#stop-search')).toHaveValue('T-Centralen');
+ await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
+ await expect(page.locator('#journey-expand')).toHaveAttribute('aria-expanded','true');
+ await expect(page.locator('.journey-overview')).toBeHidden();
+ await expect(page.locator('.journey-times')).toHaveCount(1);
+ const platforms=page.locator('.journey-platforms').first();
+ await expect(platforms.locator('p').first()).toBeHidden();
+ await platforms.locator('summary').click();
+ await expect(platforms.locator('p').first()).toBeVisible();
+ await platforms.locator('summary').click();
  await expect(page.locator('#journey-pin')).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('#journey-panel')).toContainText('Avgång');
  await expect(page.locator('#journey-panel')).toContainText('Ankomst');
@@ -256,4 +268,18 @@ test('disconnected walking exits remain flagged in search status',async({page})=
  await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
  await expect(page.locator('#status')).toBeVisible();
  await expect(page.locator('#status')).toContainText('missa möjliga resor');
+});
+
+test('clicking the previewed stop endpoint locks the journey without changing origin',async({page},info)=>{
+ test.skip(info.project.name!=='desktop','Mouse hover');
+ await init(page);await select(page);await page.locator('#calculate').click();
+ await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
+ const marker=page.getByRole('button',{name:'Universitetet · Testläge A',exact:true});
+ await marker.hover({force:true});await expect(page.locator('#journey-title')).toHaveText('Universitetet');
+ const box=await marker.boundingBox();await page.mouse.click(box!.x+box!.width/2,box!.y+box!.height/2);
+ await expect(page.locator('#journey-pin')).toHaveAttribute('aria-pressed','true');
+ await page.mouse.move(450,400,{steps:20});await page.waitForTimeout(600);
+ await expect(page.locator('#journey-title')).toHaveText('Universitetet');
+ await expect(page.locator('#stop-search')).toHaveValue('T-Centralen');
+ await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
 });

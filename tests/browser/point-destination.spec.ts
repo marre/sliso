@@ -19,14 +19,16 @@ async function inspect(page:import('@playwright/test').Page,point:{x:number;y:nu
 }
 test('arbitrary destination shows walk–transit–walk, pins and can become the next origin',async({page},info)=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await init(page);const point=await position(page);
- if(info.project.name==='desktop')await page.mouse.move(point.x,point.y);else await inspect(page,point,true);
+ if(info.project.name==='desktop'){await page.mouse.move(point.x,point.y);await expect(page.locator('#journey-title')).toHaveText('Vald målpunkt',{timeout:15000});}
+ if(info.project.name==='desktop')await page.mouse.click(point.x,point.y);else await inspect(page,point,true);
  await expect(page.locator('#journey-title')).toHaveText('Vald målpunkt',{timeout:15000});
  await expect(page.locator('#journey-panel')).toContainText('Vald kartpunkt');await expect(page.locator('#journey-panel')).toContainText('Slutgång på kartlagd väg');
  const labels=await page.locator('.journey-leg-head strong').allTextContents();expect(labels).toHaveLength(3);expect(labels[0]).toBe('Gång');expect(labels[1]).toContain('Tunnelbana');expect(labels[2]).toBe('Gång');
- expect(await journeyLines(page,'walk')).toHaveLength(2);
- if(info.project.name==='desktop'){await inspect(page,point,false);await page.mouse.move(point.x+20,point.y+20);}
+ await expect.poll(()=>journeyLines(page,'walk')).toHaveLength(2);
+ if(info.project.name==='desktop')await page.mouse.move(point.x+20,point.y+20);
+ await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
  await expect(page.locator('#journey-pin')).toContainText('Fäst ✓');
- if(info.project.name==='mobile')await page.locator('#journey-expand').click();
+ await page.locator('#journey-expand').click();
  await page.screenshot({path:`test-results/${info.project.name}-point-destination.png`,fullPage:true});
  await page.locator('#journey-start').click();await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');await expect(page.locator('#journey-panel')).toBeHidden();await expect(page.locator('#stop-search')).toHaveValue('Vald kartpunkt');expect(errors).toEqual([]);
 });
@@ -42,4 +44,16 @@ test('double clicking a result map zooms without pinning a destination',async({p
  await page.mouse.dblclick(point.x,point.y,{delay:100});
  await expect.poll(()=>page.evaluate(()=>(window as any).slisoMap.getZoom())).toBeGreaterThan(zoom);
  await page.waitForTimeout(550);await expect(page.locator('#journey-pin[aria-pressed=true]')).toHaveCount(0);
+});
+
+test('hover updates the destination again when the pointer settles elsewhere on the map',async({page},info)=>{
+ test.skip(info.project.name!=='desktop','Mouse hover');
+ await init(page);const point=await position(page);
+ await page.mouse.move(point.x,point.y);
+ await expect(page.locator('#journey-title')).toHaveText('Vald målpunkt',{timeout:15000});
+ const other=await position(page,59.34,18.0592);
+ await page.mouse.move(other.x+30,other.y+10);
+ await expect(page.locator('#point-status')).toContainText('Ingen känd gångresa',{timeout:15000});
+ await expect(page.locator('#stop-search')).toHaveValue('Vald kartpunkt');
+ await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
 });

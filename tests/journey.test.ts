@@ -55,7 +55,7 @@ test('continuous walking is grouped without mutating shared witness nodes', () =
 
 test('itinerary time uses Stockholm and explicitly labels arrival on another date', () => {
   assert.equal(journeyTime(Date.parse('2026-10-19T06:15:00Z') / 1000, '2026-10-19'), '08:15');
-  assert.equal(journeyTime(Date.parse('2026-10-19T06:15:30Z') / 1000, '2026-10-19'), '08:15:30');
+  assert.equal(journeyTime(Date.parse('2026-10-19T06:15:30Z') / 1000, '2026-10-19'), '08:15');
   assert.equal(journeyTime(Date.parse('2026-10-19T22:15:00Z') / 1000, '2026-10-19'), '00:15 (2026-10-20)');
   assert.equal(journeyTime(Date.parse('2026-12-01T07:15:00Z') / 1000, '2026-12-01'), '08:15');
 });

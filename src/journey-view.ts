@@ -21,6 +21,8 @@ export class JourneyView {
   private active: number | null = null;
   private pinned: number | null = null;
   private cutoff=Infinity;
+  private pointer?:{x:number;y:number};
+  private approaching=false;
   private point?:PointJourney;
   get isPinned(){return this.pinned!==null;}
   private timer?: ReturnType<typeof setTimeout>;
@@ -31,7 +33,7 @@ export class JourneyView {
     map.addLayer({id:'journey-halo',type:'line',source:'journey',filter:['==',['geometry-type'],'LineString'],layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#fff','line-width':9,'line-opacity':.95}});
     for(const kind of ['transit','walk'])map.addLayer({id:'journey-'+kind,type:'line',source:'journey',filter:['all',['==',['geometry-type'],'LineString'],['==',['get','kind'],kind]],layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','color'],'line-width':4,...(kind==='walk'?{'line-dasharray':[1.25,1.75]}:{})}});
     map.addLayer({id:'journey-stops',type:'circle',source:'journey',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':['get','radius'],'circle-color':['get','fill'],'circle-stroke-color':['get','color'],'circle-stroke-width':['get','weight']}});
-    this.panel.addEventListener('mouseenter', () => clearTimeout(this.timer));
+    this.panel.addEventListener('mouseenter', () => {clearTimeout(this.timer);this.panel.dispatchEvent(new Event('journeyinteract'));});
     this.panel.addEventListener('mouseleave', () => this.leave());
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && !this.panel.hidden && !document.querySelector('dialog[open]')) {
@@ -55,26 +57,48 @@ export class JourneyView {
     clearTimeout(this.timer); this.pinned = null; this.hide();this.panel.dispatchEvent(new Event('journeyclose'));
   }
 
+  /** Keep the preview stable while the pointer travels towards its controls. */
+  protectsPreview(event:MouseEvent) {
+    const next={x:event.clientX,y:event.clientY},previous=this.pointer;
+    if(previous?.x===next.x&&previous.y===next.y)return this.approaching;
+    this.pointer=next;
+    const rect=this.panel.getBoundingClientRect();
+    const distance=(p:{x:number;y:number})=>Math.hypot(Math.max(rect.left-p.x,0,p.x-rect.right),Math.max(rect.top-p.y,0,p.y-rect.bottom));
+    this.approaching=!this.panel.hidden&&!!previous&&distance(next)<distance(previous);
+    if(this.approaching)clearTimeout(this.timer);
+    return this.approaching;
+  }
+
   hover(index: number) {
     clearTimeout(this.timer);
-    if (this.pinned === null) this.show(index);
+    if (this.pinned === null && !this.panel.matches(':hover')) this.show(index);
+  }
+
+  /** Capture the visible endpoint before the delayed click can change previews. */
+  endpointSelection(at:{x:number;y:number}):(()=>void)|undefined {
+    if(this.active===null||this.panel.hidden)return;
+    const index=this.active,point=this.point,destination=point?.destination??this.stops[index];
+    if(!destination)return;
+    const pixel=this.map.project(lngLat(destination));
+    if(Math.hypot(pixel.x-at.x,pixel.y-at.y)>12)return;
+    return ()=>{if(point)this.showPoint(point,true);else this.pin(index);};
   }
 
   pin(index: number, focus = false) {
     clearTimeout(this.timer); this.pinned = index; this.show(index);
-    if (focus && !this.panel.hidden) this.panel.querySelector<HTMLButtonElement>(mobileLayout.matches?'#journey-expand':'#journey-pin')!.focus({ preventScroll: true });
+    if (focus && !this.panel.hidden) this.panel.querySelector<HTMLButtonElement>('#journey-expand')!.focus({ preventScroll: true });
   }
 
   showPoint(point:PointJourney,pin=false){
     clearTimeout(this.timer);
-    if(this.pinned!==null&&!pin)return;
+    if(!pin&&(this.pinned!==null||this.panel.matches(':hover')))return;
     if(pin)this.pinned=this.stops.length;
     this.show(this.stops.length,point);
   }
 
   leave() {
     clearTimeout(this.timer);
-    if (this.pinned === null) this.timer = setTimeout(() => this.hide(), 180);
+    if (this.pinned === null && !this.approaching) this.timer = setTimeout(() => this.hide(), 700);
   }
 
   private hide() {
@@ -82,7 +106,7 @@ export class JourneyView {
       const value = this.result.values[this.active];
       if (value) this.markers[this.active]?.setStyle({ color: '#fff', fillColor: colorFor(value.seconds, this.settings.maxMinutes), weight: 2, radius: 7 });
     }
-    this.active = null; this.point=undefined; this.routeData.features=[];(this.map.getSource('journey') as GeoJSONSource).setData(this.routeData); this.panel.hidden = true; this.panel.classList.remove('journey-expanded');
+    this.active = null; this.approaching=false; this.point=undefined; this.routeData.features=[];(this.map.getSource('journey') as GeoJSONSource).setData(this.routeData); this.panel.hidden = true; this.panel.classList.remove('journey-expanded');
     this.panel.closest('.map-section')!.classList.remove('journey-open');
   }
 
@@ -109,24 +133,29 @@ export class JourneyView {
     this.routeData={type:'FeatureCollection',features};(this.map.getSource('journey') as GeoJSONSource).setData(this.routeData);
     const walkingGap = !point && value.seconds > 0 && destination.walking === 'missing' && !destination.walkingArea;
     const time = (epoch: number) => `<time datetime="${new Date(epoch * 1000).toISOString()}">${journeyTime(epoch, settings.date)}</time>`;
-    const stopRow = (at: number, epoch: number) => `<div class="journey-stop">${time(epoch)}<div><strong>${escape(stops[at].name)}</strong><small>${escape(stops[at].platform)}</small></div></div>`;
+    const stopRow = (at: number, epoch: number) => `<div class="journey-stop">${time(epoch)}<div><strong>${escape(stops[at].name)}</strong></div></div>`;
     const rows = legs.map((leg, i) => {
       const route = leg.kind === 'transit' ? result.routes[leg.route!] : undefined;
       const color = route ? routeColor(route) : '#55645f';
       const previous = legs[i - 1], wait = previous ? leg.departure - previous.arrival : 0;
-      return `${wait > 0 ? `<li class="journey-wait">Väntan vid byte · ${minutes(wait)}</li>` : ''}<li class="journey-leg" style="--leg-color:${color}"><div class="journey-leg-head"><span class="journey-step" style="color:${route?routeTextColor(route):'#ffffff'}" aria-label="Steg ${i+1}">${transportIcon(route?.mode??'walk')}</span><div><strong>${route ? escape(MODE_NAMES[route.mode]) + ' · ' + escape(route.name) : leg.estimated ? 'Gång · uppskattad' : 'Gång'}</strong><span>${minutes(leg.arrival - leg.departure)}${leg.kind === 'walk' ? ' · '+distanceText(leg.metres) : ''}${leg.kind === 'transit' && leg.stops.length > 2 ? ` · via ${leg.stops.length - 2} hållplatser` : ''}</span></div></div>${stopRow(leg.from, leg.departure)}${stopRow(leg.to, leg.arrival)}${leg.requestStop ? '<p class="journey-request">Stopp på signal – meddela föraren.</p>' : ''}</li>`;
+      return `${wait > 0 ? `<li class="journey-wait">Väntan vid byte · ${minutes(wait)}</li>` : ''}<li class="journey-leg" style="--leg-color:${color}"><span class="journey-step" style="color:${route?routeTextColor(route):'#ffffff'}" aria-label="Steg ${i+1}">${transportIcon(route?.mode??'walk')}</span><div class="journey-leg-head"><div><strong>${route ? escape(MODE_NAMES[route.mode]) + ' · ' + escape(route.name) : leg.estimated ? 'Gång · uppskattad' : 'Gång'}</strong><span>${minutes(leg.arrival - leg.departure)}${leg.kind === 'walk' ? ' · '+distanceText(leg.metres) : ''}</span></div></div>${stopRow(leg.from, leg.departure)}${stopRow(leg.to, leg.arrival)}${[leg.from,leg.to].some(at=>stops[at].platform)?`<details class="journey-platforms"><summary>Hållplatslägen</summary>${[...new Set([leg.from,leg.to])].filter(at=>stops[at].platform).map(at=>`<p><strong>${escape(stops[at].name)}</strong> · ${escape(stops[at].platform)}</p>`).join('')}</details>`:''}${leg.requestStop ? '<p class="journey-request">Stopp på signal – meddela föraren.</p>' : ''}</li>`;
     }).join('');
     const margin=result.reverseEpoch===undefined||!legs.length?0:Math.max(0,result.reverseEpoch/2-legs.at(-1)!.arrival);
     const walks=legs.filter(l=>l.kind==='walk'),walkingSeconds=walks.reduce((sum,l)=>sum+l.arrival-l.departure,0);
     const walkingMetres=walks.every(l=>l.metres!==undefined)?walks.reduce((sum,l)=>sum+l.metres!,0):undefined;
-    this.panel.innerHTML = `<div class="journey-header"><div><span class="eyebrow">${settings.direction==='arrive'?'RESAN FRÅN':'RESAN TILL'}</span><h2 id="journey-title">${escape(destination.name)}</h2><p>${escape(destination.platform)}</p><button id="journey-expand" class="journey-expand" aria-expanded="false" aria-controls="journey-content"><strong>${minutes(value.seconds)}</strong> · ${value.kind==='walk'?'Gång':`${Math.max(0,value.boardings-1)} ${value.boardings===2?'byte':'byten'}`} <span>Visa resan ↑</span></button></div><button id="journey-close" aria-label="Stäng resedetaljer">×</button></div><div id="journey-content" class="journey-scroll"><div class="journey-summary"><strong>${minutes(value.seconds)}</strong><span>${value.kind === 'walk' ? 'Gång' : `${Math.max(0, value.boardings - 1)} ${value.boardings === 2 ? 'byte' : 'byten'}`}</span><button id="journey-pin" aria-pressed="${this.pinned === index}">${this.pinned === index ? 'Fäst ✓' : 'Fäst resan'}</button></div>${walks.some(l=>l.estimated) ? '<p class="journey-request">Resan innehåller uppskattad gång: publicerade stationsbyten i tidtabellen, granskade stationspassager eller byten mellan hållplatser med samma namn inom 250 meter. Publicerad minsta bytestid används försiktigt som gångtid där kartkoppling saknas. Avstånd saknas för sådana stationsbyten; övriga uppskattade sträckor kan ha uppskattat avstånd. Källor och begränsningar finns under Om datan.</p>' : ''}${walkingGap ? '<p class="journey-request">Vi saknar gångvägen från detta hållplatsläge i kartunderlaget. En kortare resa kan därför finnas.</p>' : ''}${legs.length ? `<p class="journey-times">Avgång ${time(legs[0].departure)}<br>Ankomst ${time(legs.at(-1)!.arrival)}</p>${margin?`<p class="journey-margin">Marginal till ankomstgränsen: ${minutes(margin)}</p>`:''}${walks.length?`<p class="journey-walking">Gång totalt: ${minutes(walkingSeconds)} · ${distanceText(walkingMetres)}</p>`:''}<ol class="journey-legs">${rows}</ol>` : '<p>Du är redan vid starthållplatsen.</p>'}<p class="journey-note">Planerade tider i Stockholmstid. ${settings.direction==='arrive'?'Färgen visar tid från senaste start till din ankomstgräns, inklusive marginal vid målet.':'Initial väntan räknas inte; väntan vid byten ingår.'}</p><p class="journey-note">${point?(settings.direction==='arrive'?'Första gångvägen från kartpunkten följer kartlagda vägar. ':'Sista gångvägen till målpunkt följer kartlagda vägar. ')+(settings.origin==='point'?(settings.direction==='arrive'?'Även gången till målpunkten följer kartlagda vägar. ':'Även gången från startpunkten följer kartlagda vägar. '):'')+'Övrig resväg är schematisk via hållplatserna.':settings.origin==='point'?(settings.direction==='arrive'?'Gången till målpunkten följer kartlagda vägar. Övrig resväg är schematisk via hållplatserna.':'Gången från kartpunkten följer kartlagda vägar. Övrig resväg är schematisk via hållplatserna.'):'Schematisk resväg via hållplatserna. Linjerna visar inte exakt spår- eller gånggeometri.'} Streckad linje betyder gång.</p><div class="journey-actions"><button id="journey-fit" ${legs.length ? '' : 'disabled'}>Visa hela resvägen</button><button id="journey-start">${settings.direction==='arrive'?'Res hit':'Res härifrån'}</button></div></div>`;
+    const overview = legs.map(leg => {
+      const route = leg.kind === 'transit' ? result.routes[leg.route!] : undefined;
+      return `<span class="journey-chip" aria-label="${route ? escape(MODE_NAMES[route.mode]) : 'Gång'}">${transportIcon(route?.mode ?? 'walk')} ${route ? escape(route.name) : minutes(leg.arrival-leg.departure)}</span>`;
+    }).join('<span class="journey-arrow" aria-hidden="true">›</span>');
+    this.panel.innerHTML = `<div class="journey-header"><div>${settings.direction==='arrive'?'<span class="eyebrow">FRÅN</span>':''}<h2 id="journey-title">${escape(destination.name)}</h2>${legs.length?`<p class="journey-times journey-arrival"><span>Avgång ${time(legs[0].departure)}</span><span>Ankomst ${time(legs.at(-1)!.arrival)}</span></p>`:''}<div class="journey-overview">${overview}</div>${walks.some(l=>l.estimated)?'<p class="journey-request">Uppskattad gång ingår</p>':''}${walkingGap?'<p class="journey-request">Gångväg saknas här. En kortare resa kan finnas.</p>':''}<button id="journey-expand" class="journey-expand" aria-expanded="false" aria-controls="journey-content"><strong>${minutes(value.seconds)}</strong> · ${value.kind==='walk'?'Gång':`${Math.max(0,value.boardings-1)} ${value.boardings===2?'byte':'byten'}`} <span>Visa detaljer</span></button></div><button id="journey-close" aria-label="Stäng resedetaljer">×</button></div><div id="journey-content" class="journey-scroll">${legs.length ? `${margin?`<p class="journey-margin">Marginal till ankomstgränsen: ${minutes(margin)}</p>`:''}${walks.length?`<p class="journey-walking">Gång totalt: ${minutes(walkingSeconds)} · ${distanceText(walkingMetres)}</p>`:''}<ol class="journey-legs">${rows}</ol>` : '<p>Du är redan vid starthållplatsen.</p>'}<details class="journey-explanation"><summary>Om tider och gångvägar</summary><p class="journey-note">${escape(destination.platform)}</p><p class="journey-note">Planerade tider i Stockholmstid. ${settings.direction==='arrive'?'Färgen visar tid från senaste start till din ankomstgräns, inklusive marginal vid målet.':'Initial väntan räknas inte; väntan vid byten ingår.'}</p><p class="journey-note">${point?(settings.direction==='arrive'?'Första gångvägen från kartpunkten följer kartlagda vägar. ':'Sista gångvägen till målpunkt följer kartlagda vägar. ')+(settings.origin==='point'?(settings.direction==='arrive'?'Även gången till målpunkten följer kartlagda vägar. ':'Även gången från startpunkten följer kartlagda vägar. '):'')+'Övrig resväg är schematisk via hållplatserna.':settings.origin==='point'?(settings.direction==='arrive'?'Gången till målpunkten följer kartlagda vägar. Övrig resväg är schematisk via hållplatserna.':'Gången från kartpunkten följer kartlagda vägar. Övrig resväg är schematisk via hållplatserna.'):'Schematisk resväg via hållplatserna. Linjerna visar inte exakt spår- eller gånggeometri.'} Streckad linje betyder gång.</p></details><div class="journey-actions"><button id="journey-pin" aria-pressed="${this.pinned === index}">${this.pinned === index ? 'Fäst ✓' : 'Fäst resan'}</button><button id="journey-fit" ${legs.length ? '' : 'disabled'}>Visa hela resvägen</button><button id="journey-start">${settings.direction==='arrive'?'Res hit':'Res härifrån'}</button></div></div>`;
     this.panel.hidden = false; this.panel.closest('.map-section')!.classList.add('journey-open');
     this.panel.dispatchEvent(new Event('journeyopen'));
     this.panel.querySelector<HTMLButtonElement>('#journey-expand')!.onclick=()=>{
       const open=this.panel.classList.toggle('journey-expanded');
+      if(open){this.pinned=index;this.panel.querySelector('#journey-pin')!.setAttribute('aria-pressed','true');this.panel.querySelector('#journey-pin')!.textContent='Fäst ✓';this.panel.dispatchEvent(new Event('journeyinteract'));}
       const button=this.panel.querySelector<HTMLButtonElement>('#journey-expand')!;
       button.setAttribute('aria-expanded',String(open));
-      button.querySelector('span')!.textContent=open?'Dölj detaljer ↓':'Visa resan ↑';
+      button.querySelector('span')!.textContent=open?'Dölj detaljer':'Visa detaljer';
     };
     this.panel.querySelector<HTMLButtonElement>('#journey-close')!.onclick = () => { this.close(); this.map.getContainer().focus(); };
     this.panel.querySelector<HTMLButtonElement>('#journey-pin')!.onclick = () => { this.pinned = this.pinned === index ? null : index; this.show(index); };

@@ -29,22 +29,22 @@ $('#app').innerHTML = `
 <aside id="search-settings" class="panel" aria-label="Sökinställningar"><div class="mobile-panel-header"><strong>Sökinställningar</strong><button id="mobile-close-search" type="button">Visa kartan ↓</button></div>
 <div class="eyebrow"><span class="live-dot"></span> UTFORSKA MED SL</div>
 <h1>Hur långt<br>når <em>du?</em></h1>
-<p class="intro">En startplats. En stund på vägen.<br>Upptäck vad som finns inom räckhåll.</p>
+<p class="intro">Välj en plats och se hur långt du når.</p>
 <div id="data-banner" class="notice">Laddar hållplatser…</div>
 <form id="search-form">
-<div class="field"><label for="direction">Sökriktning</label><select id="direction"><option value="depart">Res från en plats</option><option value="arrive">Varifrån når jag målet?</option></select></div>
+<div class="field"><label for="direction">Jag vill</label><select id="direction"><option value="depart">Resa från en plats</option><option value="arrive">Vara framme en viss tid</option></select></div>
 <div class="field search-field"><label for="stop-search"><span class="field-icon" aria-hidden="true">◎</span> <span id="place-label">Var börjar resan?</span></label><input id="stop-search" placeholder="Sök hållplats eller station" autocomplete="off" role="combobox" aria-controls="stop-options" aria-autocomplete="list" aria-expanded="false" disabled><ul id="stop-options" role="listbox" hidden></ul></div>
 <p id="start-data-gap" class="notice demo" hidden></p>
 <div class="date-row"><div class="field"><label for="date">Datum</label><input id="date" type="date" required></div><div class="field"><label for="time"><span id="time-label">Avresetid</span> <span class="label-note">Stockholm</span></label><input id="time" type="time" required></div></div>
-<p class="time-note">Initial väntan räknas inte. Vi visar den kortaste restiden bland avgångar i ditt avgångsfönster.</p>
-<div class="field range-field"><label for="max-time">Hur länge vill du resa? <output id="max-output" for="max-time">60 <small>min</small></output></label><input id="max-time" type="range" min="10" max="120" step="1" value="60"><div class="range-ends"><span>10 min</span><span>120 min</span></div></div>
-<details id="options"><summary><span aria-hidden="true">☷</span> Fler alternativ <span class="summary-meta">Gång, byten & trafikslag</span></summary><div class="options-body"><div class="field"><label for="walk">Max gång per sträcka</label><select id="walk">${[5,10,15,20,25,30].map(n=>`<option value="${n}" ${n===15?'selected':''}>${n} minuter</option>`).join('')}</select><p class="hint">Sammanhängande gång, även via flera hållplatser. 4,8 km/h.</p></div><div class="date-row"><div class="field"><label for="transfers">Max byten</label><select id="transfers">${[0,1,2,3,4].map(n=>`<option value="${n}" ${n===3?'selected':''}>${n} byten</option>`).join('')}</select></div><div class="field"><label for="window" id="window-label">Avgångsfönster</label><input id="window" type="number" min="5" max="120" value="30" required><p class="hint">5–120 minuter</p></div></div><p class="hint" id="window-note">Första påstigning måste ske inom fönstret från vald tid. Väntan vid byten ingår alltid.</p><fieldset><legend>Trafikslag</legend><div class="mode-grid">${MODES.map(m=>`<label class="mode-chip"><input type="checkbox" name="mode" value="${m}" checked><span class="mode-symbol" style="color:${MODE_COLORS[m]}">${transportIcon(m)}</span><span>${MODE_NAMES[m]}</span></label>`).join('')}</div></fieldset></div></details>
+<p class="time-note">Restid utan väntan före första avgången.</p>
+<div class="field range-field"><label for="max-time">Max restid <output id="max-output" for="max-time">60 <small>min</small></output></label><input id="max-time" type="range" min="10" max="120" step="1" value="60"><div class="range-ends"><span>10 min</span><span>120 min</span></div></div>
+<details id="options"><summary><span aria-hidden="true">☷</span> Fler alternativ <span class="summary-meta">Gång · byten · trafikslag</span></summary><div class="options-body"><div class="field"><label for="walk">Max gång per sträcka</label><select id="walk">${[5,10,15,20,25,30].map(n=>`<option value="${n}" ${n===15?'selected':''}>${n} minuter</option>`).join('')}</select><p class="hint">Sammanhängande gång, även via flera hållplatser. 4,8 km/h.</p></div><div class="date-row"><div class="field"><label for="transfers">Max byten</label><select id="transfers">${[0,1,2,3,4].map(n=>`<option value="${n}" ${n===3?'selected':''}>${n} byten</option>`).join('')}</select></div><div class="field"><label for="window" id="window-label">Avgångsfönster</label><input id="window" type="number" min="5" max="120" value="30" required><p class="hint">5–120 minuter</p></div></div><p class="hint" id="window-note">Första påstigning måste ske inom fönstret från vald tid. Väntan vid byten ingår alltid.</p><fieldset><legend>Trafikslag</legend><div class="mode-grid">${MODES.map(m=>`<label class="mode-chip"><input type="checkbox" name="mode" value="${m}" checked><span class="mode-symbol" style="color:${MODE_COLORS[m]}">${transportIcon(m)}</span><span>${MODE_NAMES[m]}</span></label>`).join('')}</div></fieldset></div></details>
 <div id="form-error" class="error" role="alert" hidden></div>
 <div class="search-actions"><button id="calculate" class="primary" type="submit" disabled>Visa restidskarta <span aria-hidden="true">${arrow}</span></button><button id="reset-search" class="reset-search" type="button" title="Välj ny startpunkt och behåll restidsinställningarna" disabled>Nollställ</button></div><button type="button" id="cancel" class="cancel" hidden>Avbryt beräkning</button>
 <div id="status" role="status" aria-live="polite">Välj en hållplats för att börja.</div><p id="walking-status" class="hint" role="status"></p>
 </form><div class="panel-foot"><span aria-hidden="true">◷</span> Planerad trafik · Ingen realtid <button id="data-open" class="text-button">Om datan</button></div>
 </aside>
-<section class="map-section" aria-label="Restidskarta"><div id="map-progress" class="map-progress" hidden><div role="progressbar" aria-label="Beräkning" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="map-progress-fill"></span></div><span class="map-progress-text"></span></div><div id="map" aria-busy="false" data-search-state="idle"></div><div id="point-status" class="point-status" role="status" hidden></div><div class="map-heading"><span class="map-heading-dot"></span><span id="map-label">STOCKHOLM & OMKRING</span></div><div id="map-demo" class="map-demo" hidden>TESTDATA · Ej för reseplanering</div><button id="mobile-toggle" class="mobile-toggle" aria-controls="search-settings" aria-expanded="true">Dölj sökpanel ↓</button><button id="map-cancel" class="map-cancel" hidden>Avbryt sökning</button><div class="map-actions"><button id="fit" title="Visa hela trafiknätet" aria-label="Visa hela trafiknätet">⌖</button></div><div id="map-empty" class="map-tip"><span aria-hidden="true">◎</span><div><strong>Allt börjar någonstans.</strong><span>Sök en hållplats eller klicka på kartan för att välja start.</span></div></div><aside id="journey-panel" class="journey-panel" aria-label="Resedetaljer" aria-labelledby="journey-title" hidden></aside><button id="share" class="share-button" aria-label="Kopiera delningslänk" title="Kopiera delningslänk" disabled><span aria-hidden="true">${arrow}</span> Kopiera delningslänk</button><div class="map-source" id="source-note">Hållplatser och ungefärliga gångområden</div></section>
+<section class="map-section" aria-label="Restidskarta"><div id="map-progress" class="map-progress" hidden><div role="progressbar" aria-label="Beräkning" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="map-progress-fill"></span></div><span class="map-progress-text"></span></div><div id="map" aria-busy="false" data-search-state="idle"></div><div id="point-status" class="point-status" role="status" hidden></div><div class="map-heading"><span class="map-heading-dot"></span><span id="map-label">STOCKHOLM & OMKRING</span></div><div id="map-demo" class="map-demo" hidden>TESTDATA · Ej för reseplanering</div><button id="mobile-toggle" class="mobile-toggle" aria-controls="search-settings" aria-expanded="true">Dölj sökpanel ↓</button><button id="map-cancel" class="map-cancel" hidden>Avbryt sökning</button><div class="map-actions"><button id="fit" title="Visa hela trafiknätet" aria-label="Visa hela trafiknätet">⌖</button></div><div id="map-empty" class="map-tip"><span aria-hidden="true">◎</span><div><strong>Välj en plats på kartan</strong><span>Eller sök efter en hållplats i sökpanelen.</span></div></div><aside id="journey-panel" class="journey-panel" aria-label="Resedetaljer" aria-labelledby="journey-title" hidden></aside><button id="share" class="share-button" aria-label="Kopiera delningslänk" title="Kopiera delningslänk" disabled><span aria-hidden="true">${arrow}</span> Dela karta</button><div class="map-source" id="source-note">Hållplatser och ungefärliga gångområden</div></section>
 </main>
 <dialog id="info-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><h2 id="dialog-title"></h2><button id="dialog-close" aria-label="Stäng">×</button></div><div id="dialog-body"></div></dialog>`;
 
@@ -104,7 +104,7 @@ function setStart(index: number, recalculate = false) {
   $<HTMLInputElement>('#stop-search').value = stop.station;
   clearStart();
   addPointPin(stop,false,`${$<HTMLSelectElement>('#direction').value==='arrive'?'Mål':'Start'}: ${stop.name} · ${stop.platform}`);
-  $('#start-data-gap').textContent=stop.walking==='estimated'?'Gång härifrån kan innehålla uppskattade stationsbyten: publicerade bytestider, granskade passager eller hållplatser med samma namn inom 250 meter. Se resedetaljerna för den valda resan.':'Gånganslutningar saknas från detta läge. Resultatet kan därför missa möjliga resor.';
+  $('#start-data-gap').textContent=stop.walking==='estimated'?'Vissa gånganslutningar är uppskattade. Se resedetaljer.':'Gånganslutningar saknas från detta läge. Resultatet kan därför missa möjliga resor.';
   $('#start-data-gap').hidden=manifest.demo||stop.walking==='available'||!!stop.walkingArea;
   $('#map-label').textContent = `${$<HTMLSelectElement>('#direction').value==='arrive'?'TILL':'FRÅN'} ${stop.name.toLocaleUpperCase('sv')}`;
   $('#calculate').removeAttribute('disabled'); $('#share').removeAttribute('disabled');$('#reset-search').removeAttribute('disabled');map.panTo(lngLat(stop),{duration:0});
@@ -130,10 +130,10 @@ function applySettings(s: Settings) {
 function updateDirection() {
   const arrive=$<HTMLSelectElement>('#direction').value==='arrive';
   $('h1').innerHTML=arrive?'Varifrån<br>hinner <em>du?</em>':'Hur långt<br>når <em>du?</em>';
-  $('.intro').innerHTML=arrive?'Ett mål. En tid att passa.<br>Upptäck var du kan börja resan.':'En startplats. En stund på vägen.<br>Upptäck vad som finns inom räckhåll.';
+  $('.intro').innerHTML=arrive?'Välj ett mål och när du vill vara framme.':'Välj en plats och se hur långt du når.';
   $('#place-label').textContent=arrive?'Vart vill du komma?':'Var börjar resan?';
   $('#time-label').textContent=arrive?'Senast framme':'Avresetid';
-  $('.time-note').textContent=arrive?'Visar senaste möjliga start före din ankomsttid. Färgerna inkluderar eventuell tidsmarginal vid målet.':'Initial väntan räknas inte. Vi visar den kortaste restiden bland avgångar i ditt avgångsfönster.';
+  $('.time-note').textContent=arrive?'Visar senaste start. Tidsmarginal vid målet ingår.':'Restid utan väntan före första avgången.';
   $<HTMLInputElement>('#window').disabled=arrive;$('#window').parentElement!.hidden=arrive;$('#window-note').hidden=arrive;
   $('#source-note').textContent=arrive?'Senaste start före ankomstgränsen · gångvägar vid inzoomning':'Hållplatser och ungefärliga gångområden';
   $('#map-label').textContent=pointOrigin?`${arrive?'TILL':'FRÅN'} VALD KARTPUNKT`:selected>=0?`${arrive?'TILL':'FRÅN'} ${stops[selected].name.toLocaleUpperCase('sv')}`:'STOCKHOLM & OMKRING';
@@ -232,7 +232,7 @@ function setPointStart(point:{lat:number;lon:number},recalculate=true){
   pointOrigin={lat:Math.round(point.lat*1e7)/1e7,lon:Math.round(point.lon*1e7)/1e7};
   $('#stop-options').hidden=true;$('#stop-search').setAttribute('aria-expanded','false');
   $<HTMLInputElement>('#stop-search').value='Vald kartpunkt';
-  $('#start-data-gap').hidden=false;$('#start-data-gap').textContent='Gång följer kartlagda vägar. Punkten läggs på närmaste gångväg inom 25 m och visas på kartan. Saknas väg får du välja en ny punkt. Gången ingår i restid och gånggräns.';
+  $('#start-data-gap').hidden=false;$('#start-data-gap').textContent='Gång från närmaste kartlagda väg ingår i restiden.';
   clearStart();addPointPin(pointOrigin);$('#calculate').removeAttribute('disabled');$('#share').removeAttribute('disabled');$('#reset-search').removeAttribute('disabled');
   updateDirection();$('#form-error').hidden=true;status('Kartpunkt vald. Redo att beräkna gångvägar och resor.');
   if(recalculate)void calculate();
@@ -241,12 +241,18 @@ function setPointStart(point:{lat:number;lon:number},recalculate=true){
 map.on('click',(event:MapMouseEvent)=>{
   cancelOriginClick();
   if(event.originalEvent?.detail>1||pointDestinations.consumesOriginClick())return;
+  const selectEndpoint=journeyView.endpointSelection(event.point);
+  if(selectEndpoint)pointDestinations.pause();
   const target=(event.originalEvent?.target as Element|null)?.closest?.('[data-stop-index]');
   const index=target?Number(target.getAttribute('data-stop-index')):hitStop(map,event.point);
   if(!manifest||(index===undefined&&!manifest.footpaths))return;
-  originClick=setTimeout(()=>{if(index!==undefined&&isMapStop(stops[index]))setStart(index,true);else setPointStart({lat:event.lngLat.lat,lon:event.lngLat.lng});},450);
+  originClick=setTimeout(()=>{
+    if(selectEndpoint){closePopup();selectEndpoint();return;}
+    if(index!==undefined&&isMapStop(stops[index]))setStart(index,true);
+    else setPointStart({lat:event.lngLat.lat,lon:event.lngLat.lng});
+  },450);
 });
-map.on('mousemove','stops',event=>{const index=Number(event.features?.[0]?.properties.index);if(Number.isInteger(index)){pointDestinations.pause();if(matchMedia('(hover: hover)').matches)journeyView.hover(index);}});
+map.on('mousemove','stops',event=>{if(journeyView.protectsPreview(event.originalEvent))return;const index=Number(event.features?.[0]?.properties.index);if(Number.isInteger(index)){pointDestinations.pause();if(matchMedia('(hover: hover)').matches)journeyView.hover(index);}});
 map.on('mouseleave','stops',()=>journeyView.leave());
 map.on('contextmenu','stops',event=>{const index=Number(event.features?.[0]?.properties.index);if(result?.values[index]){closePopup();journeyView.pin(index);}});
 for(const type of ['dblclick','movestart','contextmenu'] as const)map.on(type,cancelOriginClick);
