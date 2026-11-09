@@ -151,3 +151,14 @@
 .journey-platforms p{font-size:11px;line-height:1.5;margin:4px 0 8px}
 .journey-actions #journey-pin{margin-left:0}
 @media(max-width:760px),(max-width:1000px) and (max-height:500px) and (pointer:coarse){.journey-platforms summary{min-height:44px}}
+
+/* Consistent icon, time and stop columns make each leg easy to scan. */
+.journey-leg{display:grid;grid-template-columns:28px minmax(0,1fr);column-gap:10px;row-gap:3px;border-left:0;border-bottom:1px solid var(--line);padding:0 0 10px;margin-bottom:10px}
+.journey-leg>.journey-step{grid-column:1;grid-row:1 / 4;align-self:start;width:28px;height:28px}
+.journey-leg-head,.journey-stop,.journey-platforms,.journey-leg>.journey-request{grid-column:2;min-width:0}
+.journey-leg-head{margin-bottom:3px;min-height:22px}
+.journey-stop{grid-template-columns:42px minmax(0,1fr);column-gap:9px;margin:0;line-height:1.6}
+.journey-stop time{font-variant-numeric:tabular-nums}
+.journey-stop strong{overflow-wrap:anywhere}
+.journey-wait{padding:0 0 10px 38px}
+.journey-leg>.journey-request{margin-top:2px}

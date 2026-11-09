@@ -44,7 +44,6 @@ export function journeyFromNode(result:SearchResult,at:number|null,tail?:Journey
 
 export function journeyTime(epoch: number, searchDate: string): string {
   const local = stockholmNow(new Date(epoch * 1000));
-  const seconds = Math.floor(epoch) % 60;
-  const clock = local.time + (seconds ? ':' + String(seconds).padStart(2, '0') : '');
+  const clock = local.time;
   return local.date === searchDate ? clock : `${clock} (${local.date})`;
 }
