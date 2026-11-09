@@ -47,8 +47,8 @@ test('map clicks replace the origin directly; double clicks and dragging only na
  zoom=await page.evaluate(()=>(window as any).testMap.getZoom());await page.mouse.dblclick(p.x+45,p.y,{delay:100});await expect.poll(()=>page.evaluate(()=>(window as any).testMap.getZoom())).toBeGreaterThan(zoom);
  await page.waitForTimeout(550);expect(await page.evaluate(()=>(window as any).searches.length)).toBe(2);
  p=await position(page);await drag(page,p,mobile);await page.waitForTimeout(550);expect(await page.evaluate(()=>(window as any).searches.length)).toBe(2);
- // A station marker follows the same click/zoom contract as the map background.
- p=await position(page,59.331,18.0592);await page.mouse.click(p.x,p.y);await expect.poll(()=>page.evaluate(()=>(window as any).searches.length)).toBe(3);await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
+ // A hovered stop is the preview endpoint: clicking locks it, then its action changes origin.
+ p=await position(page,59.331,18.0592);await page.mouse.click(p.x,p.y);if(!mobile){await expect(page.locator('#journey-pin')).toHaveAttribute('aria-pressed','true');expect(await page.evaluate(()=>(window as any).searches.length)).toBe(2);await page.locator('#journey-expand').click();await page.locator('#journey-start').click();}await expect.poll(()=>page.evaluate(()=>(window as any).searches.length)).toBe(3);await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
  expect(await page.evaluate(()=>(window as any).searches.at(-1).stop)).toBe('demo-2');
  await position(page,59.331,18.0592);
  const pin=page.locator('.start-pin');const box=await pin.boundingBox();

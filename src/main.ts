@@ -241,10 +241,13 @@ function setPointStart(point:{lat:number;lon:number},recalculate=true){
 map.on('click',(event:MapMouseEvent)=>{
   cancelOriginClick();
   if(event.originalEvent?.detail>1||pointDestinations.consumesOriginClick())return;
+  const selectEndpoint=journeyView.endpointSelection(event.point);
+  if(selectEndpoint)pointDestinations.pause();
   const target=(event.originalEvent?.target as Element|null)?.closest?.('[data-stop-index]');
   const index=target?Number(target.getAttribute('data-stop-index')):hitStop(map,event.point);
   if(!manifest||(index===undefined&&!manifest.footpaths))return;
   originClick=setTimeout(()=>{
+    if(selectEndpoint){closePopup();selectEndpoint();return;}
     if(index!==undefined&&isMapStop(stops[index]))setStart(index,true);
     else setPointStart({lat:event.lngLat.lat,lon:event.lngLat.lng});
   },450);

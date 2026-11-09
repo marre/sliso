@@ -74,6 +74,16 @@ export class JourneyView {
     if (this.pinned === null && !this.panel.matches(':hover')) this.show(index);
   }
 
+  /** Capture the visible endpoint before the delayed click can change previews. */
+  endpointSelection(at:{x:number;y:number}):(()=>void)|undefined {
+    if(this.active===null||this.panel.hidden)return;
+    const index=this.active,point=this.point,destination=point?.destination??this.stops[index];
+    if(!destination)return;
+    const pixel=this.map.project(lngLat(destination));
+    if(Math.hypot(pixel.x-at.x,pixel.y-at.y)>12)return;
+    return ()=>{if(point)this.showPoint(point,true);else this.pin(index);};
+  }
+
   pin(index: number, focus = false) {
     clearTimeout(this.timer); this.pinned = index; this.show(index);
     if (focus && !this.panel.hidden) this.panel.querySelector<HTMLButtonElement>('#journey-expand')!.focus({ preventScroll: true });

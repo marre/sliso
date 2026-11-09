@@ -262,3 +262,17 @@ test('disconnected walking exits remain flagged in search status',async({page})=
  await expect(page.locator('#status')).toBeVisible();
  await expect(page.locator('#status')).toContainText('missa möjliga resor');
 });
+
+test('clicking the previewed stop endpoint locks the journey without changing origin',async({page},info)=>{
+ test.skip(info.project.name!=='desktop','Mouse hover');
+ await init(page);await select(page);await page.locator('#calculate').click();
+ await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
+ const marker=page.getByRole('button',{name:'Universitetet · Testläge A',exact:true});
+ await marker.hover({force:true});await expect(page.locator('#journey-title')).toHaveText('Universitetet');
+ const box=await marker.boundingBox();await page.mouse.click(box!.x+box!.width/2,box!.y+box!.height/2);
+ await expect(page.locator('#journey-pin')).toHaveAttribute('aria-pressed','true');
+ await page.mouse.move(450,400,{steps:20});await page.waitForTimeout(600);
+ await expect(page.locator('#journey-title')).toHaveText('Universitetet');
+ await expect(page.locator('#stop-search')).toHaveValue('T-Centralen');
+ await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
+});
