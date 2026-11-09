@@ -132,6 +132,13 @@ test('destination selection stays fixed while opening details and changes origin
  await expect(page.locator('#stop-search')).toHaveValue('T-Centralen');
  await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');
  await expect(page.locator('#journey-expand')).toHaveAttribute('aria-expanded','true');
+ await expect(page.locator('.journey-overview')).toBeHidden();
+ await expect(page.locator('.journey-times')).toHaveCount(1);
+ const platforms=page.locator('.journey-platforms').first();
+ await expect(platforms.locator('p').first()).toBeHidden();
+ await platforms.locator('summary').click();
+ await expect(platforms.locator('p').first()).toBeVisible();
+ await platforms.locator('summary').click();
  await expect(page.locator('#journey-pin')).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('#journey-panel')).toContainText('Avgång');
  await expect(page.locator('#journey-panel')).toContainText('Ankomst');
