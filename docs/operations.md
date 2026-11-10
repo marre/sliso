@@ -249,3 +249,28 @@ time colours. Keyboard targets are limited to 128 in
 view and use delegated focus/keyboard handlers. Highlighting updates feature state;
 only actual visibility/colour changes rebuild the GeoJSON source. See
 [the measured rendering comparison](stop-rendering-performance.md).
+
+
+## Städning av datareleaser
+
+Efter lyckad publicering och push av `data/release.json` städar samma jobb
+GitHub Releases. Publicerade `data-sl-*`-arkiv äldre än 14 dagar tas bort, men
+minst de tre senast publicerade datapaketen behålls. Den nya och föregående
+releasepekaren samt `data/release.json` på alla befintliga branchers spetsar
+skyddas oavsett ålder. Lägg `[keep-data]` i en releases beskrivning för att
+behålla ett särskilt rollbackmål. Gamla oanvända brancher kan därför förhindra
+städning tills de tas bort eller deras data pekas om.
+
+Utkast, prereleaser och andra releasetyper lämnas kvar. Git-taggar, gångcache,
+kvotjournal och redan distribuerade Cloudflare-filer påverkas inte. Om någon
+pekare inte kan läsas/valideras eller refererar till en saknad release stoppas
+städningen före radering. En branch utan datafil är tillåten (t.ex. `data-state`).
+Misslyckad städning markerar jobbet som misslyckat men återställer inte en redan
+publicerad release. Bygg av äldre commits kan kräva en ny datareleasepekare när
+deras arkiv har raderats.
+
+Förhandsgranska utan att radera (kräver `gh` med repositoryåtkomst):
+
+```sh
+python scripts/cleanup_releases.py --repository marre/sliso --protect-descriptor data/release.json
+```
