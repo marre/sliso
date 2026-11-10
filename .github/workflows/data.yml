@@ -306,9 +306,15 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git pull --ff-only origin main
+          cp data/release.json .data-build/previous-release.json
           cp .data-build/release.json data/release.json
           git add data/release.json
           if ! git diff --cached --quiet; then
             git commit -m 'Update pinned real-data release for Cloudflare'
             git push origin HEAD:main
           fi
+
+      - name: Clean up old data releases after publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/cleanup_releases.py --repository "$GITHUB_REPOSITORY" --protect-descriptor data/release.json --protect-descriptor .data-build/previous-release.json --apply
