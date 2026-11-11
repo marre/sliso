@@ -37,13 +37,14 @@ export class StopMarker {
  * MapLibre's worker retains clustering and keyboard DOM stays bounded. */
 export class MapStops {
  private markers:StopMarker[]=[];private byIndex=new globalThis.Map<number,StopMarker>();private frame=0;private keyboardFrame=0;
- private mounted=new Set<HTMLElement>();private clustered=false;
+ private mounted=new Set<HTMLElement>();private clustered=false;private showOverview=false;
  constructor(private map:Map){
   map.addSource('stops',{type:'geojson',cluster:false,clusterRadius:40,clusterMaxZoom:10,data:{type:'FeatureCollection',features:[]}});
   map.addLayer({id:'stops',type:'circle',source:'stops',filter:['!', ['has','point_count']],paint:{'circle-radius':['coalesce',['feature-state','radius'],['get','radius']],'circle-color':['get','fillColor'],'circle-opacity':['get','fillOpacity'],'circle-stroke-color':['coalesce',['feature-state','color'],['get','color']],'circle-stroke-width':['coalesce',['feature-state','weight'],['get','weight']]}});
   map.on('moveend',()=>this.scheduleKeyboard());map.on('resize',()=>this.scheduleKeyboard());
   map.on('sourcedata',e=>{if(e.sourceId==='stops'&&e.isSourceLoaded)this.scheduleKeyboard();});
  }
+ showOverviewStops(show:boolean){if(this.showOverview===show)return;this.showOverview=show;this.schedule();}
  add(stop:Stop,index:number){const marker=new StopMarker(stop,index,this);this.markers.push(marker);this.byIndex.set(index,marker);this.schedule();return marker;}
  schedule(){if(!this.frame)this.frame=requestAnimationFrame(()=>this.flush());}
  highlight(marker:StopMarker){this.map.setFeatureState({source:'stops',id:marker.index},{radius:marker.style.radius,color:marker.style.color,weight:marker.style.weight});}
@@ -78,7 +79,7 @@ export class MapStops {
   this.mounted=next;
  }
  private flush(){this.frame=0;
-  const visible=this.markers.filter(m=>m.visible),clustered=visible.length>=CLUSTER_THRESHOLD;
+  const visible=this.markers.filter(m=>m.visible),clustered=!this.showOverview&&visible.length>=CLUSTER_THRESHOLD;
   const source=this.map.getSource('stops') as GeoJSONSource;
   if(clustered!==this.clustered){this.clustered=clustered;source.setClusterOptions({cluster:clustered});}
   const data:FeatureCollection<Point>={type:'FeatureCollection',features:visible.map(m=>({type:'Feature',id:m.index,geometry:{type:'Point',coordinates:lngLat(m.stop)},properties:{index:m.index,...m.style}}))};

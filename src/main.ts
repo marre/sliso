@@ -81,6 +81,7 @@ function terminate(message?: string) {
 }
 function clearResults() {
   pointDestinations.reset();journeyView.reset();walkingView.reset();closePopup();mapProgress.reset();previewValues=[];previewActive=false;
+  stopLayer.showOverviewStops(false);
   result = undefined; usedSettings = undefined; $('#map').dataset.searchState='idle';$('#map').setAttribute('aria-busy','false');$('#walking-status').textContent=''; $('#map-empty').hidden = false;
   for (const marker of markers) {
     if(!marker)continue;
@@ -163,6 +164,7 @@ function renderResults(r: SearchResult,s: Settings) {
     $('#start-data-gap').textContent=`${s.direction==='arrive'?'Gångmål':'Gångstart'} på kartlagd väg${origin.snapMetres>=1?`, ${Math.round(origin.snapMetres)} m från vald punkt`:''}. Gånganslutningen räknas in i restid och gånggräns.`;
   }
   result=r; usedSettings=s;$('#map-empty').hidden=true;
+  stopLayer.showOverviewStops(s.direction==='arrive');
   const exitGap=walkingExitGap(r,s,stops);
   const exitWarning='Ingen kollektivresa hittades. De nådda hållplatslägena saknar koppling till kartans gångnät. Resultatet kan därför missa möjliga resor. Prova en närliggande hållplats eller ett annat avgångsfönster.';
   $('#map').dataset.searchState='complete';$('#map').setAttribute('aria-busy','false');
@@ -354,7 +356,9 @@ function updateMobile(){
   const collapsed=document.body.classList.contains('panel-collapsed');
   $('#mobile-toggle').textContent=collapsed?(pointOrigin?'Kartpunkt · Ändra':selected>=0?stops[selected].name+' · Ändra':'Sök hållplats'):'Visa kartan';
   $('#mobile-toggle').setAttribute('aria-expanded',String(!collapsed));
-  setTimeout(()=>map.resize(),0);
+  // The layout is already toggled. Resize now so immediate clicks use the new
+  // projection and no queued resize cancels their delayed origin selection.
+  map.resize();
 }
 function setMobileSearch(open:boolean){
   if(open){journeyView.close();closePopup();}

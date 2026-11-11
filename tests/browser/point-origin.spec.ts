@@ -56,7 +56,17 @@ test('map clicks replace the origin directly; double clicks and dragging only na
  await page.waitForTimeout(550);expect(await page.evaluate(()=>(window as any).searches.length)).toBe(3);
 });
 test('a new map click supersedes an in-flight calculation and ignores its late data',async({page},info)=>{
- await mapSetup(page);if(info.project.name==='mobile')await page.locator('#mobile-close-search').click();
+ await mapSetup(page);
+ if(info.project.name==='mobile'){
+  // Assert the resize in the same task as closing: a timeout-based resize can
+  // leave projection stale and cancel a click after this function returns.
+  const dimensions=await page.evaluate(()=>{
+   document.querySelector<HTMLButtonElement>('#mobile-close-search')!.click();
+   const map=(window as any).testMap;
+   return {canvas:map.getCanvas().clientHeight,container:map.getContainer().clientHeight};
+  });
+  expect(dimensions.canvas).toBe(dimensions.container);
+ }
  let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);await page.route('**/*.bin',async r=>{await gate;await r.continue().catch(()=>{});});
  try{
   let p=await position(page);await page.mouse.click(p.x,p.y);await expect.poll(()=>page.evaluate(()=>(window as any).searches.length)).toBe(1);
