@@ -356,7 +356,9 @@ function updateMobile(){
   const collapsed=document.body.classList.contains('panel-collapsed');
   $('#mobile-toggle').textContent=collapsed?(pointOrigin?'Kartpunkt · Ändra':selected>=0?stops[selected].name+' · Ändra':'Sök hållplats'):'Visa kartan';
   $('#mobile-toggle').setAttribute('aria-expanded',String(!collapsed));
-  setTimeout(()=>map.resize(),0);
+  // The layout is already toggled. Resize now so immediate clicks use the new
+  // projection and no queued resize cancels their delayed origin selection.
+  map.resize();
 }
 function setMobileSearch(open:boolean){
   if(open){journeyView.close();closePopup();}
