@@ -162,3 +162,5 @@
 .journey-stop strong{overflow-wrap:anywhere}
 .journey-wait{padding:0 0 10px 38px}
 .journey-leg>.journey-request{margin-top:2px}
+
+.arrival-walking-zoom{position:absolute;z-index:450;left:16px;top:104px;max-width:calc(100% - 90px);min-height:44px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:#fffffff5;color:var(--green);box-shadow:0 2px 8px #183e3612;font-size:12px}

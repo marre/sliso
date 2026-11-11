@@ -6,6 +6,7 @@ import type {Manifest,SearchResult,Settings,Stop} from './core/types';
  * mapped incoming paths instead; outgoing polygons cannot prove access TO it.
  * Bound the viewport's working set on phones. Wide views keep the stop map. */
 export class ReverseWalkingView {
+ private overview?:HTMLButtonElement;
  private worker?:Worker;private image?:BandCanvas;private timer?:ReturnType<typeof setTimeout>;private generation=0;
  private data?:{result:SearchResult;settings:Settings;manifest:Manifest;stops:Stop[]};
  constructor(private map:Map,private status:(text:string)=>void,private progress?:(done:number,total:number,failed:number)=>void){}
@@ -13,9 +14,10 @@ export class ReverseWalkingView {
  setData(result:SearchResult,settings:Settings,manifest:Manifest,stops:Stop[]){
   this.data={result,settings,manifest,stops};this.map.on('movestart',this.move);this.map.on('moveend',this.move);this.map.on('resize',this.move);this.draw();
  }
- reset(){this.generation++;clearTimeout(this.timer);this.worker?.terminate();this.worker=undefined;this.image?.remove();this.image=undefined;this.map.off('movestart',this.move);this.map.off('moveend',this.move);this.map.off('resize',this.move);}
+ reset(){this.overview?.remove();this.overview=undefined;this.generation++;clearTimeout(this.timer);this.worker?.terminate();this.worker=undefined;this.image?.remove();this.image=undefined;this.map.off('movestart',this.move);this.map.off('moveend',this.move);this.map.off('resize',this.move);}
  private draw(){
   if(!this.data||this.map.isMoving())return;
+  this.overview?.remove();this.overview=undefined;
   const {result,settings,manifest,stops}=this.data;
   const bounds=this.map.getBounds(),margin=(settings.walkMinutes*80+100)/111195,longitude=margin/Math.cos(this.map.getCenter().lat*Math.PI/180);
   const refs=Object.entries(manifest.footpaths?.index??{}).filter(([key])=>{
@@ -24,7 +26,13 @@ export class ReverseWalkingView {
   }).map(([,ref])=>ref);
   if(!manifest.footpaths||!refs.length){this.progress?.(0,0,0);this.status('Inkommande gångvägar saknas i detta dataset.');return;}
   if(refs.length>96||refs.reduce((n,r)=>n+r.bytes,0)>8_000_000){
-   this.progress?.(0,0,0);this.status('Zooma in för att se gångvägar mot målet. Hållplatsernas resultat är färdiga.');return;
+   this.progress?.(0,0,0);this.status('Zooma in för att se gångvägar mot målet. Hållplatsernas resultat är färdiga.');
+   const button=this.overview=document.createElement('button');
+   button.className='arrival-walking-zoom';button.type='button';
+   button.textContent='Visa gångvägar · zooma in';
+   button.title='Hållplatser visas i översikten. Zooma in för kartlagda gångvägar.';
+   button.onclick=()=>this.map.easeTo({zoom:Math.max(14,this.map.getZoom()+1)});
+   this.map.getContainer().parentElement!.append(button);return;
   }
   if(!this.worker){
    this.worker=new Worker(new URL('./reverse-walking-worker.ts',import.meta.url),{type:'module'});

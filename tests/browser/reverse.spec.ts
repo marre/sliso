@@ -44,3 +44,30 @@ test('arrival mode ignores an invalid departure window instead of blocking the f
  await page.locator('#stop-search').fill('T-Centralen');await page.locator('#stop-search').press('ArrowDown');await page.locator('#stop-search').press('Enter');await page.locator('#time').fill('09:00');
  await page.locator('#calculate').click();await expect(page.locator('#map')).toHaveAttribute('data-search-state','complete');await expect(page.locator('#form-error')).toBeHidden();
 });
+
+test('arrival overview explains hidden walking paths and zoom action restores them',async({page})=>{
+ await page.goto('/');await expect(page.locator('#stop-search')).toBeEnabled();
+ await page.evaluate(async()=>{
+  const {createMap}=await import('/src/map.ts' as string),{ReverseWalkingView}=await import('/src/reverse-walking-view.ts' as string);
+  const manifest=await (await fetch('/data/manifest.json')).json();
+  const stops=await (await fetch(manifest.stops.url)).json();
+  const ref=Object.values(manifest.footpaths.index)[0];
+  manifest.footpaths.index={};
+  for(let y=1160;y<1210;y++)for(let x=335;x<385;x++)manifest.footpaths.index[y+'_'+x]=ref;
+  const host=document.createElement('div');host.style.cssText='position:fixed;inset:0;z-index:10000';
+  const el=document.createElement('div');el.id='arrival-overview-test';el.style.cssText='width:100%;height:100%';host.append(el);document.body.append(host);
+  const map=await createMap(el,[18.059,59.331],6,'none');
+  const view=new ReverseWalkingView(map,()=>{});
+  view.setData({destinationSources:[],origin:{anchor:{from:0,to:1,t:.5}}},{direction:'arrive',maxMinutes:60,walkMinutes:15},manifest,stops);
+  (window as any).arrivalOverview={map,view};
+ });
+ await expect(page.locator('.arrival-walking-zoom')).toBeVisible();
+ await expect(page.locator('#arrival-overview-test canvas.walking-raster')).toHaveCount(0);
+ await page.locator('.arrival-walking-zoom').click();
+ await expect(page.locator('.arrival-walking-zoom')).toHaveCount(0);
+ await expect(page.locator('#arrival-overview-test canvas.walking-raster')).toBeAttached({timeout:15000});
+ await page.evaluate(()=>(window as any).arrivalOverview.map.setZoom(6));
+ await expect(page.locator('.arrival-walking-zoom')).toBeVisible();
+ await page.evaluate(()=>(window as any).arrivalOverview.view.reset());
+ await expect(page.locator('.arrival-walking-zoom')).toHaveCount(0);
+});

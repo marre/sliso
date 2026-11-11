@@ -12,7 +12,7 @@ test('dense maps bound keyboard DOM, hide dense overview groups, and highlight w
   for(let i=0;i<1200;i++)markers.push(layer.add({id:String(i),name:'Station '+i,station:'Station '+i,platform:'A',lat:59.28+Math.floor(i/40)*.004,lon:17.9+(i%40)*.005},i));
   await new Promise(requestAnimationFrame);if(!map.loaded())await map.once('idle');
   let calls=0;const source=map.getSource('stops'),setData=source.setData;source.setData=function(...args:any[]){calls++;return setData.apply(this,args);};
-  (window as any).stopsTest={map,markers,calls:()=>calls,resetCalls:()=>{calls=0;}};
+  (window as any).stopsTest={map,layer,markers,calls:()=>calls,resetCalls:()=>{calls=0;}};
  });
  await expect.poll(()=>page.evaluate(()=>(window as any).stopsTest.map.getSource('stops').getClusterOptions().cluster)).toBe(true);
  await page.waitForFunction(()=>(window as any).stopsTest.map.isSourceLoaded('stops'));
@@ -27,6 +27,12 @@ test('dense maps bound keyboard DOM, hide dense overview groups, and highlight w
  await page.evaluate(()=>{const t=(window as any).stopsTest;t.markers[0].setStyle({radius:10});t.markers[0].setStyle({radius:7,fillColor:'#d9f0a3'});});
  await expect.poll(()=>page.evaluate(()=>(window as any).stopsTest.calls())).toBe(1);
  expect(await page.evaluate(()=>(window as any).stopsTest.map.getFeatureState({source:'stops',id:0}))).toEqual({});
+ await page.evaluate(()=>(window as any).stopsTest.layer.showOverviewStops(true));
+ await expect.poll(()=>page.evaluate(()=>(window as any).stopsTest.map.getSource('stops').getClusterOptions().cluster)).toBe(false);
+ await expect.poll(()=>page.evaluate(()=>(window as any).stopsTest.map.queryRenderedFeatures({layers:['stops']}).length)).toBeGreaterThan(500);
+ expect(await page.locator('#stop-performance-map .map-stop').count()).toBeLessThanOrEqual(128);
+ await page.evaluate(()=>(window as any).stopsTest.layer.showOverviewStops(false));
+ await expect.poll(()=>page.evaluate(()=>(window as any).stopsTest.map.getSource('stops').getClusterOptions().cluster)).toBe(true);
  await page.evaluate(()=>{const t=(window as any).stopsTest;t.map.jumpTo({center:[17.95,59.31],zoom:13});});
  await expect.poll(()=>page.evaluate(()=>(window as any).stopsTest.map.queryRenderedFeatures({layers:['stops']}).length)).toBeGreaterThan(0);
  await expect.poll(()=>page.locator('#stop-performance-map .map-stop').count()).toBeGreaterThan(0);
