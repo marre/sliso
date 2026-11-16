@@ -1,10 +1,8 @@
 import mapWorkerURL from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import {Map,setWorkerUrl,NavigationControl,ScaleControl,LngLatBounds,MercatorCoordinate,type LngLatLike,type StyleSpecification} from 'maplibre-gl';
-import {LogoControl} from '@maptoolkit/maplibre-logo-control';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import '@maptoolkit/maplibre-logo-control/style.css';
 setWorkerUrl(mapWorkerURL);
-export const MAP_STYLE='https://styles.maptoolkit.org/summer.json';
+export const MAP_STYLE='https://tiles.openfreemap.org/styles/liberty';
 export const blankStyle:StyleSpecification={version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e8eee4'}}]};
 export const lngLat=(p:{lat:number;lon:number}|readonly number[]):[number,number]=>Array.isArray(p)?[p[1],p[0]]:[(p as {lon:number}).lon,(p as {lat:number}).lat];
 export function boundsOf(points:readonly (readonly number[])[]){return points.reduce((b,p)=>b.extend(lngLat(p)),new LngLatBounds());}
@@ -20,13 +18,12 @@ export async function createMap(container:string|HTMLElement,center:[number,numb
  if(styleURL!=='none')try{
   const response=await fetch(styleURL,{signal:AbortSignal.timeout(10000)});if(!response.ok)throw new Error('Basemap unavailable');style=await response.json();
  }catch{failed=true;}
- const map=new Map({container,style,center,zoom,maxZoom:19,renderWorldCopies:false,dragRotate:false,pitchWithRotate:false,maxPitch:0,attributionControl:styleURL==='none'?false:{compact:false,customAttribution:''}});
+ const map=new Map({container,style,center,zoom,maxZoom:19,renderWorldCopies:false,dragRotate:false,pitchWithRotate:false,maxPitch:0,attributionControl:styleURL==='none'?false:{customAttribution:''}});
  map.touchZoomRotate.disableRotation();
  map.addControl(new NavigationControl({showCompass:false}),'top-right');
  map.addControl(new ScaleControl({unit:'metric'}),'bottom-right');
- if(styleURL!=='none')map.addControl(new LogoControl(),'bottom-left');
  await map.once('style.load');
- map.getContainer().dataset.basemap=failed?'unavailable':styleURL==='none'?'none':'maptoolkit';
+ map.getContainer().dataset.basemap=failed?'unavailable':styleURL==='none'?'none':styleURL===MAP_STYLE?'openfreemap':'custom';
  map.getContainer().tabIndex=0;map.getCanvas().tabIndex=-1;
  map.getContainer().dispatchEvent(new CustomEvent('sliso:map-ready',{bubbles:true,detail:map}));
  if(failed)map.getContainer().dispatchEvent(new CustomEvent('basemaperror',{bubbles:true}));

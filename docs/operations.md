@@ -212,22 +212,33 @@ Existing checkouts should run:
 git remote set-url origin https://github.com/marre/sliso.git
 ```
 
-### MapLibre and Maptoolkit.org basemap
+### MapLibre and OpenFreeMap basemap
 
-The default vector style is `https://styles.maptoolkit.org/summer.json`.
-Maptoolkit.org's community service requires no account or API key. Its
-[attribution requirements](https://docs.maptoolkit.org/attribution/) require the
-logo (at least 24 px high) and an always expanded copyright line. The official
-logo control is bundled; MapLibre's AttributionControl uses `compact: false`
-and reads the copyright text from the provider's TileJSON. Mobile overlays leave
-space below them for the logo and copyright, including in landscape.
+The default vector style is `https://tiles.openfreemap.org/styles/liberty`.
+The public [OpenFreeMap](https://openfreemap.org/) service requires no account or
+API key, but does not provide an uptime SLA. Its [attribution policy](https://openfreemap.org/)
+requires credit for OpenMapTiles and OpenStreetMap, automatically supplied by the
+style's vector-source metadata in MapLibre. An OpenFreeMap logo is not required.
+Attribution is expanded on first display; on maps at most 640 px wide MapLibre
+collapses it after the user drags the map, with an accessible control to reopen
+the credit and license links. On wider maps it remains expanded. Application
+CSS must not style MapLibre's `details` / `summary` control as a form accordion.
+The nonessential scale bar is hidden on mobile to make room for attribution.
 
 `VITE_MAP_STYLE_URL` optionally overrides the public style URL at build time.
 Use `none` for tests or a map with no external basemap requests. The former
 `VITE_TILE_URL` / `VITE_TILE_ATTRIBUTION` raster settings are no longer used.
-No Maptoolkit key is needed or read. Style/tile/font/sprite requests go directly
+No provider key is needed or read. Style/tile/font/sprite requests go directly
 to the provider; no map images are prefetched or saved in the app's data cache.
 MapLibre's module worker is served from the app's own versioned assets.
+
+Privacy: OpenFreeMap [states that it uses no cookies](https://openfreemap.org/privacy/),
+but requests still disclose the viewer's IP address and approximate map area
+to the provider (and possibly its CDN). The app's About/Data text discloses
+this external request path. Audit actual response headers and any CDN security
+cookies before claiming that no consent banner is necessary. Do not add
+offline basemap downloads without checking the provider's
+[download conditions](https://openfreemap.org/tos/).
 
 Stops and journey lines use native GeoJSON/WebGL layers. Stops retain labelled
 keyboard hit targets. The existing contour worker still merges precomputed
