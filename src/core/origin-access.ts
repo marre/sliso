@@ -89,7 +89,11 @@ function routeAccess(graph:FootpathGraph,point:Point,maxSeconds:number,reverse:b
       }
     }
   }
-  if(!reached.size)throw new Error('Inga hållplatser nås längs kartlagda gångvägar inom gånggränsen. Prova längre gångtid eller en annan startpunkt. Saknade gångkopplingar kan påverka resultatet.');
+  // A valid mapped pedestrian origin is useful even without any bound stops.
+  // The point-to-point destination worker can still route directly to this anchor.
+  // Keep the empty access set rather than misreporting a disconnected transit stop
+  // as an unmapped pedestrian origin.
+
   return {anchor:{from:snap.edge.from,to:snap.edge.to,t:snap.t},lat:snap.point[0],lon:snap.point[1],snapMetres:snap.metres,walks:[...reached.values()]};
 }
 export function originTileRefs(m:Manifest,point:Point,minutes:number):FileRef[] {

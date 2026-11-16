@@ -57,3 +57,18 @@ test('multi-stop access matches an explicit virtual origin across 80 seeded time
   assert.deepEqual(sources(next),sources(expected),`walking sources ${sample}`);
  }
 });
+
+test('walk-only origin remains valid when no stop binding is reachable',()=>{
+ const graph=graphFromTiles([{schema:1,nodes:[[1,590000000,180000000],[2,590000000,180010000]],edges:[[1,2,80,60,0]],stops:[]}],stops);
+ const origin=routeOrigin(graph,[59,18.0002],300);
+ assert.deepEqual(origin.walks,[]);
+ assert.ok(origin.anchor);
+ const target=routeDestinationAccess(graph,[59,18.0008],300,{stop:stops.length,...origin});
+ const direct=target.walks.find(w=>w.to===stops.length);
+ assert.ok(direct,'the destination can be reached without a transit stop');
+ assert.ok(direct.seconds>0&&direct.seconds<=60);
+ const settings={...defaults(stops[0]),origin:'point' as const,stop:'@point',walkMinutes:5};
+ const result=search({stops,routes:[],connections:[],walks:[],transfers:[]},settings,{access:origin,destinationJourneys:true});
+ assert.equal(result.destinationSources?.length,0);
+ assert.equal(result.values.filter(Boolean).length,0);
+});

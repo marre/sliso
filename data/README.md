@@ -216,7 +216,8 @@ SHA-256 hashes, decompresses them and runs bounded Dijkstra in the routing worke
 The chosen origin is projected onto a mapped edge within 25 metres; the displayed
 start pin moves to that path and the UI reports the snap distance. This is a change
 of starting position, not a simulated off-network walking link. A point without a
-nearby mapped path or a reachable bound stop produces an explicit error. Routes
+nearby mapped path produces an explicit error. A mapped point with no reachable
+bound stop remains valid for direct walking journeys; it has no transit access. Routes
 respect walking direction and retain their physical geometry for the itinerary.
 Initial access counts toward journey time, the continuous walking limit and first
 boarding feasibility. The existing route scanner, transfer closure and stop-based
