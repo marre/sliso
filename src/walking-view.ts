@@ -96,7 +96,7 @@ export class WalkingView {
     const requests=new Map<number,AbortController>(),failed=new Set<number>();
     let selected=new Set<number>();
     let wanted=new Set<number>(),queue:number[]=[],profileVersion=0,view=0,busy=false,pending=false,mergeError=false;
-    let generation=0,nextToken=0;
+    let generation=0,nextToken=0,sentDirectGeneration=-1;
     const loading=new Map<number,{resolve:()=>void;reject:()=>void}>();
     const load=(file:number,signal:AbortSignal)=>new Promise<void>((resolve,reject)=>{
       const token=nextToken++;
@@ -145,7 +145,11 @@ export class WalkingView {
       const grid:RasterGrid={width:Math.max(1,Math.ceil(w*scale)),height:Math.max(1,Math.ceil(h*scale)),bounds:[clip.getWest(),clip.getSouth(),clip.getEast(),clip.getNorth()]};
       profileEnd('main.budgets',started,{files:this.profiles.size,wanted:wanted.size});
       const post=profileStart();
-      merger.postMessage({type:'render',version,view,generation,cutoff:this.cutoff,maxMinutes:settings.maxMinutes,bands,grid,overview,direct});profileEnd('main.post',post);progress();
+      // Only clone the potentially large graph segment payload once per viewport.
+      // Cutoff updates reuse the same directed walking field in the worker.
+      const includeDirect=sentDirectGeneration!==generation;
+      merger.postMessage({type:'render',version,view,generation,cutoff:this.cutoff,maxMinutes:settings.maxMinutes,bands,grid,overview,direct:includeDirect?direct:undefined});
+      sentDirectGeneration=generation;profileEnd('main.post',post);progress();
     };
     this.schedule=()=>{
       pending=true;

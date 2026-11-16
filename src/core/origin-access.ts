@@ -97,15 +97,18 @@ function routeAccess(graph:FootpathGraph,point:Point,maxSeconds:number,reverse:b
   // Reuse the bounded routing distances for the direct-walking map overlay.
   // Unreachable endpoints stay -1; a one-way edge may only be entered from
   // its from-node, except for the origin's permitted partial edge.
-  const directWalking:DirectWalkingCoverage|undefined=includeDirect?{
-    maxSeconds,segments:graph.segments.flatMap((edge):DirectWalkingSegment[]=>{
+  let directWalking:DirectWalkingCoverage|undefined;
+  if(includeDirect){
+    const segments:DirectWalkingSegment[]=[];
+    for(const edge of graph.segments){
       const from=dist.get(edge.from)??-1,to=edge.oneway?-1:dist.get(edge.to)??-1;
       const anchorT=edge===snap.edge?snap.t:-1;
-      if(from<0&&to<0&&anchorT<0)return [];
+      if(from<0&&to<0&&anchorT<0)continue;
       const a=graph.nodes.get(edge.from)!,b=graph.nodes.get(edge.to)!;
-      return [[a[0],a[1],b[0],b[1],edge.seconds,from,to,anchorT,edge.oneway?1:0]];
-    })
-  }:undefined;
+      segments.push([a[0],a[1],b[0],b[1],edge.seconds,from,to,anchorT,edge.oneway?1:0]);
+    }
+    directWalking={maxSeconds,segments};
+  }
   return {anchor:{from:snap.edge.from,to:snap.edge.to,t:snap.t},lat:snap.point[0],lon:snap.point[1],snapMetres:snap.metres,walks:[...reached.values()],...(directWalking?{directWalking}:{})};
 }
 export function originTileRefs(m:Manifest,point:Point,minutes:number):FileRef[] {
