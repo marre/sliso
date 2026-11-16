@@ -84,12 +84,21 @@ export function rasterBands(bands:AreaBand[],grid:RasterGrid):Uint8Array{
  return field;
 }
 
-export function paintBands(field:Uint8Array,grid:RasterGrid,maxMinutes:number,cutoff:number,partial?:Uint8Array):Uint8ClampedArray{
+export function paintBands(field:Uint8Array,grid:RasterGrid,maxMinutes:number,cutoff:number,partial?:Uint8Array,directSeconds?:Uint16Array):Uint8ClampedArray{
  const visible=new Uint8Array(field.length),rgba=new Uint8ClampedArray(field.length*4);
  const lower=Math.floor(cutoff/10)*10;
  for(let i=0;i<field.length;i++){
   const value=field[i];
-  visible[i]=partial?(value&&value<=lower?value:partial[i]?cutoff:0):(value<=cutoff?value:0);
+  visible[i]=partial?(value&&value<=lower?value:partial[i]?cutoff:0):(value&&value<=cutoff?value:0);
+  // The direct walking graph has second-level costs. Quantize to the same
+  // ten-minute colour bands as the stop contours, while respecting a partial
+  // cutoff exactly. Keep the fastest of the two independent alternatives.
+  const direct=directSeconds?.[i]??0;
+  if(direct&&direct<=cutoff*60){
+    const band=Math.min(maxMinutes,Math.max(1,Math.ceil(direct/600)*10));
+    const minutes=Math.min(band,cutoff);
+    if(!visible[i]||minutes<visible[i])visible[i]=minutes;
+  }
  }
  const colors=Array.from({length:maxMinutes+1},(_,n)=>colorFor(n*60,maxMinutes).slice(1).match(/../g)!.map(v=>parseInt(v,16)));
  const {width,height}=grid;

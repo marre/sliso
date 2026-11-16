@@ -2,11 +2,12 @@ import {configureProfile,profileStart,profileEnd,drainProfile} from './core/prof
 import {BandRaster,rasterBands,paintBands,type AreaBand,type RasterGrid} from './core/bands';
 import {deliveryProfiles,legacyProfiles,type Profiles} from './core/contours';
 import {verified} from './core/data';
-import type {FileRef} from './core/types';
-let version='',generation=-1,raster:BandRaster|undefined;
+import {rasterDirectWalking} from './core/direct-walking';
+import type {DirectWalkingCoverage,FileRef} from './core/types';
+let version='',generation=-1,raster:BandRaster|undefined,directRaster:Uint16Array|undefined;
 const partials=new Map<number,Uint8Array>(),files=new Map<number,Profiles>(),byStop=new Map<string,Profiles[string]>(),loads=new Map<number,{file:number;controller:AbortController}>();
 let wanted=new Set<number>();
-interface Job {type:'render';version:string;view:number;generation:number;cutoff:number;maxMinutes:number;overview?:boolean;bands:{minutes:number;allowances:[string,number][]}[];grid:RasterGrid}
+interface Job {type:'render';version:string;view:number;generation:number;cutoff:number;maxMinutes:number;overview?:boolean;bands:{minutes:number;allowances:[string,number][]}[];grid:RasterGrid;direct?:DirectWalkingCoverage}
 type Command={type:'profile';enabled:boolean}|Job|{type:'retain';files:number[]}|{type:'abort';token:number}|{type:'load';token:number;file:number;ref:FileRef;format?:string};
 self.onmessage=({data}:MessageEvent<Command>)=>{
  if(data.type==='profile'){configureProfile(data.enabled,'walking-worker');return}
@@ -39,7 +40,7 @@ function render(data:Job){
  const started=profileStart();let stage=profileStart();
  try{
   if(generation!==data.generation){
-   partials.clear();raster=new BandRaster(data.grid);generation=data.generation;version='';
+   partials.clear();raster=new BandRaster(data.grid);directRaster=data.direct?rasterDirectWalking(data.direct,data.grid):undefined;generation=data.generation;version='';
   }
   const bands:AreaBand[]=data.bands.map(b=>({minutes:b.minutes,geometries:b.allowances.flatMap(([id,minutes])=>{
    const contours=byStop.get(id);
@@ -61,12 +62,12 @@ function render(data:Job){
    while(partials.size>3)partials.delete(partials.keys().next().value!);
   }
   stage=profileStart();
-  const pixels=paintBands(raster!.field,data.grid,data.maxMinutes,data.cutoff,partial?partials.get(data.cutoff):undefined);
+  const pixels=paintBands(raster!.field,data.grid,data.maxMinutes,data.cutoff,partial?partials.get(data.cutoff):undefined,directRaster);
   profileEnd('render.paint',stage);stage=profileStart();
   let x0=data.grid.width,y0=data.grid.height,x1=0,y1=0;
   for(let i=0;i<raster!.field.length;i++)if(pixels[i*4+3]){const x=i%data.grid.width,y=Math.floor(i/data.grid.width);x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x+1);y1=Math.max(y1,y+1);}
   profileEnd('render.extent',stage);profileEnd('render.total',started,{generation:data.generation,version:data.version,pixels:data.grid.width*data.grid.height,files:files.size});
   const extent=x1>x0?[x0,y0,x1,y1]:undefined;
   (self as unknown as {postMessage(value:unknown,transfer:Transferable[]):void}).postMessage({profileEvents:drainProfile(),version,view:data.view,generation:data.generation,cutoff:data.cutoff,width:data.grid.width,height:data.grid.height,pixels,extent,cachedCutoffs:[...partials.keys()]},[pixels.buffer]);
- }catch{version='';generation=-1;raster=undefined;partials.clear();self.postMessage({version:data.version,view:data.view,generation:data.generation,error:true});}
+ }catch{version='';generation=-1;raster=undefined;directRaster=undefined;partials.clear();self.postMessage({version:data.version,view:data.view,generation:data.generation,error:true});}
 };

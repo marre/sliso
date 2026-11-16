@@ -1,6 +1,6 @@
 import {verified} from './data';
 import {isPublicStop} from './stops';
-import type {FileRef,Manifest,OriginAccess,Settings,Stop} from './types';
+import type {DirectWalkingCoverage,DirectWalkingSegment,FileRef,Manifest,OriginAccess,Settings,Stop} from './types';
 
 type Point=[number,number]; // latitude, longitude
 export interface FootpathTile {schema:1;nodes:number[][];edges:number[][];stops:(number|string)[][]}
@@ -37,10 +37,10 @@ export function graphFromTiles(tiles:FootpathTile[],stops:Stop[]):FootpathGraph 
 }
 
 /** Bounded Dijkstra on mapped edges. Projection chooses a path start, never an off-network link. */
-export function routeOrigin(graph:FootpathGraph,point:Point,maxSeconds:number):OriginAccess {return routeAccess(graph,point,maxSeconds,false);}
+export function routeOrigin(graph:FootpathGraph,point:Point,maxSeconds:number):OriginAccess {return routeAccess(graph,point,maxSeconds,false,undefined,true);}
 export function routeDestinationAccess(graph:FootpathGraph,point:Point,maxSeconds:number,origin?:{stop:number;lat:number;lon:number;anchor?:OriginAccess['anchor']}):OriginAccess {return routeAccess(graph,point,maxSeconds,true,origin);}
 export function routeSourceAccess(graph:FootpathGraph,point:Point,maxSeconds:number,destination?:{stop:number;lat:number;lon:number;anchor?:OriginAccess['anchor']}):OriginAccess {return routeAccess(graph,point,maxSeconds,false,destination);}
-function routeAccess(graph:FootpathGraph,point:Point,maxSeconds:number,reverse:boolean,origin?:{stop:number;lat:number;lon:number;anchor?:OriginAccess['anchor']}):OriginAccess {
+function routeAccess(graph:FootpathGraph,point:Point,maxSeconds:number,reverse:boolean,origin?:{stop:number;lat:number;lon:number;anchor?:OriginAccess['anchor']},includeDirect=false):OriginAccess {
   let nearest:{edge:FootpathGraph['segments'][number];t:number;point:Point;metres:number}|undefined;
   for(const edge of graph.segments){const snap=project(point,graph.nodes.get(edge.from)!,graph.nodes.get(edge.to)!);if(!nearest||snap.metres<nearest.metres)nearest={edge,...snap};}
   if(!nearest||nearest.metres>25)throw new Error('Ingen kartlagd gångväg inom 25 meter. Välj en punkt på en gångväg eller gata i kartan.');
@@ -94,7 +94,19 @@ function routeAccess(graph:FootpathGraph,point:Point,maxSeconds:number,reverse:b
   // Keep the empty access set rather than misreporting a disconnected transit stop
   // as an unmapped pedestrian origin.
 
-  return {anchor:{from:snap.edge.from,to:snap.edge.to,t:snap.t},lat:snap.point[0],lon:snap.point[1],snapMetres:snap.metres,walks:[...reached.values()]};
+  // Reuse the bounded routing distances for the direct-walking map overlay.
+  // Unreachable endpoints stay -1; a one-way edge may only be entered from
+  // its from-node, except for the origin's permitted partial edge.
+  const directWalking:DirectWalkingCoverage|undefined=includeDirect?{
+    maxSeconds,segments:graph.segments.flatMap((edge):DirectWalkingSegment[]=>{
+      const from=dist.get(edge.from)??-1,to=edge.oneway?-1:dist.get(edge.to)??-1;
+      const anchorT=edge===snap.edge?snap.t:-1;
+      if(from<0&&to<0&&anchorT<0)return [];
+      const a=graph.nodes.get(edge.from)!,b=graph.nodes.get(edge.to)!;
+      return [[a[0],a[1],b[0],b[1],edge.seconds,from,to,anchorT,edge.oneway?1:0]];
+    })
+  }:undefined;
+  return {anchor:{from:snap.edge.from,to:snap.edge.to,t:snap.t},lat:snap.point[0],lon:snap.point[1],snapMetres:snap.metres,walks:[...reached.values()],...(directWalking?{directWalking}:{})};
 }
 export function originTileRefs(m:Manifest,point:Point,minutes:number):FileRef[] {
   const meta=m.footpaths;

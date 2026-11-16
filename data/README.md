@@ -221,9 +221,15 @@ bound stop remains valid for direct walking journeys; it has no transit access. 
 respect walking direction and retain their physical geometry for the itinerary.
 Initial access counts toward journey time, the continuous walking limit and first
 boarding feasibility. The existing route scanner, transfer closure and stop-based
-contours then operate with those access states. No new contour from the arbitrary
-origin itself is generated; contours still start at reached stops with the walking
-budget reduced by access time. Missing OSM links can still hide possible journeys.
+contours then operate with those access states. For point origins, the routing
+worker also retains bounded directed walking times on mapped edges. The map
+renders these as narrow, approximately 25-metre pedestrian corridors and
+combines them with the stop-based contour by choosing the lowest travel time
+per display pixel. Direct walking does not require any reachable stop. This is
+a visual approximation, not a claim that every nearby property or pathway is
+accessible; unmapped routes, disconnected footpaths and OSM restrictions can
+still hide possible journeys. The direct corridor uses the same 30-minute
+walking limit as the point journey planner.
 
 Files have a `.bin` extension and contain deterministic gzip-compressed UTF-8 JSON
 with `schema: 1`, node rows `[id,latE7,lonE7]`, edge rows

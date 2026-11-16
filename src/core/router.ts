@@ -243,5 +243,5 @@ export function search(network: Network, settings: Settings, options: { fixedAnc
     destinationSources=terminal.flatMap(row=>row.map(l=>({stop:l.stop,seconds:cost(l),walked:l.walk,arrival:l.time,boardings:l.boardings,journey:serialize(l),requestStop:l.requestStop||undefined})));
   }
   profileEnd('routing.journeys',serialization,{nodes:journeys.length,labels});
-  return { ...(destinationSources?{destinationSources}:{}), ...(options.access?{origin:{lat:options.access.lat,lon:options.access.lon,snapMetres:options.access.snapMetres,...(options.access.anchor?{anchor:options.access.anchor}:{})}}:{}), values, journeys, routes: network.routes, walkSources: finalWalking.flat(), labels, elapsed: performance.now() - started, complete: true };
+  return { ...(destinationSources?{destinationSources}:{}), ...(options.access?.directWalking?{directWalking:options.access.directWalking}:{}), ...(options.access?{origin:{lat:options.access.lat,lon:options.access.lon,snapMetres:options.access.snapMetres,...(options.access.anchor?{anchor:options.access.anchor}:{})}}:{}), values, journeys, routes: network.routes, walkSources: finalWalking.flat(), labels, elapsed: performance.now() - started, complete: true };
 }
