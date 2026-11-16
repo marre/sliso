@@ -7,7 +7,7 @@ test('OpenFreeMap default style keeps credits accessible and uses responsive mob
  await page.route('https://tiles.openfreemap.org/test/**',r=>r.fulfill({body:Buffer.alloc(0)}));
  await page.goto('/');await expect(page.locator('#stop-search')).toBeEnabled();
  await page.evaluate(async()=>{
-  const {createMap,MAP_STYLE}=await import('/src/map.ts');
+  const module='/src/map.ts',{createMap,MAP_STYLE}=await import(module);
   if(MAP_STYLE!=='https://tiles.openfreemap.org/styles/liberty')throw new Error('Unexpected default style');
   const el=document.createElement('div');el.id='provider-map';el.style.cssText='position:fixed;inset:0;z-index:10000';document.body.append(el);
   (window as any).providerMap=await createMap(el,[18,59.33],12,MAP_STYLE);
