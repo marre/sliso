@@ -107,7 +107,7 @@ test('hovered reverse origins use forward mapped paths, including point-to-point
  const r=searchArriveBy(n,settings(n,{origin:'point',stop:'@point'}),{destinationJourneys:true,access:{lat:59,lon:18.0015,snapMetres:0,anchor:{from:2,to:3,t:.5},walks:[]}});
  const journey=choosePointJourney(r,settings(n,{origin:'point',stop:'@point'}),n.stops,access)!;
  assert.equal(journey.legs[0].from,6);assert.equal(journey.legs.at(-1)!.to,5);assert.equal(journey.legs.at(-1)!.arrival,deadline);
- assert.throws(()=>routeDestinationAccess(g,[59,18.0005],300),/Inga hållplatser/);
+ assert.deepEqual(routeDestinationAccess(g,[59,18.0005],300).walks,[]);
 });
 
 test('incoming path raster clips long roads, bounds its brush and preserves empty space',()=>{

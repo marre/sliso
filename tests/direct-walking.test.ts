@@ -46,7 +46,8 @@ test('origin mid-edge respects oneway restrictions and the precise walking cutof
 });
 
 test('direct walking improves transit contours and respects partial cutoff rendering',()=>{
- const origin=routeOrigin(graphFromTiles([tile],[]),[59,18.0005],150);
+ const slow:FootpathTile={...tile,edges:[[1,2,60,1000,0]]};
+ const origin=routeOrigin(graphFromTiles([slow],[]),[59,18.0005],150);
  const field=rasterDirectWalking(origin.directWalking!,grid);
  const contours=new Uint8Array(grid.width*grid.height).fill(20);
  const combined=paintBands(contours,grid,30,30,undefined,field);
