@@ -35,6 +35,8 @@ test('walking-only map renders directed reachability without any stop contour',a
  });
  await expect.poll(count,{timeout:15000}).toBeGreaterThan(0);
  const before=await count();
+ // A filled neighbourhood is substantially wider than the former 25 m trace.
+ expect(before).toBeGreaterThan(1000);
  await page.evaluate(()=>(window as any).directTestView.setCutoff(1));
  await expect.poll(()=>canvas.getAttribute('data-cutoff'),{timeout:15000}).toBe('1');
  const after=await count();
