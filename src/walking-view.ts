@@ -6,7 +6,7 @@ import {padBounds,containsBounds,worldProject,worldUnproject,distance,lngLat} fr
 import {useContourOverview} from './core/contour-view';
 import { walkingMinutes } from './core/walking';
 import { bandLimits, type RasterGrid } from './core/bands';
-import type { Manifest, SearchResult, Settings, Stop } from './core/types';
+import type { ContourFiles, Manifest, SearchResult, Settings, Stop } from './core/types';
 
 
 export class WalkingView {
@@ -58,8 +58,9 @@ export class WalkingView {
     const available=walkingMinutes(result.walkSources,settings.maxMinutes*60,settings.walkMinutes*60);
     const positions=new Map<number,number[]>(),fullDeliveries=new Map<number,number>();
     for(const index of available.keys()){
-      const id=stops[index].id,file=areas?.index[id],source=areas?.sources?.[id]??file;
+      const id=stops[index].id,file=areas?.index[id];
       if(file!==undefined){
+        const source=areas?.sources?.[id]??file;
         positions.set(source,[...(positions.get(source)??[]),index]);fullDeliveries.set(source,file);
       }
     }
@@ -74,7 +75,8 @@ export class WalkingView {
       const files=new Set([...selected].map(source=>fullDeliveries.get(source)!));
       return !!areas?.overview&&useContourOverview(this.map.getZoom()+1,files.size,[...files].reduce((n,file)=>n+areas!.files[file].bytes,0));
     };
-    const overview=needsOverview(selection()),delivery=overview?areas!.overview!:areas??{index:{},files:[]};
+    const overview=needsOverview(selection());
+    const delivery:ContourFiles=overview?areas!.overview!:(areas??{index:{},files:[]});
     if(overview){
       this.overviewNote=document.createElement('div');this.overviewNote.className='walking-overview-note';
       this.overviewNote.textContent='Översikt · zooma in för detaljer';this.overviewNote.setAttribute('aria-hidden','true');
@@ -134,7 +136,7 @@ export class WalkingView {
       const partial=this.cutoff%10!==0&&this.cutoff!==settings.maxMinutes;
       const limits=known?(partial&&!this.workerCutoffs.has(this.cutoff)?[this.cutoff]:[]):[...new Set([...standard,this.cutoff])].sort((a,b)=>a-b);
       const bands=limits.map(minutes=>({minutes,allowances:[...budget(minutes)].flatMap(([index,allowance])=>{
-        const id=stops[index].id,file=delivery.index[id];return selected.has(areas?.sources?.[id]??areas?.index[id])&&wanted.has(file)&&this.profiles.has(file)?[[id,allowance] as [string,number]]:[];
+        const id=stops[index].id,file=delivery.index[id];return file!==undefined&&selected.has(areas?.sources?.[id]??file)&&wanted.has(file)&&this.profiles.has(file)?[[id,allowance] as [string,number]]:[];
       })}));
       // Profile deliveries may arrive during an animated zoom, before zoomend
       // advances the viewport generation. Keep its raster grid at its own zoom.
