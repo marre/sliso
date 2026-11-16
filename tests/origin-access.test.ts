@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {graphFromTiles,routeOrigin,originTileRefs,type FootpathTile} from '../src/core/origin-access';
+import {graphFromTiles,routeOrigin,routeDestinationAccess,originTileRefs,type FootpathTile} from '../src/core/origin-access';
 import {defaults,shareHash,parseHash} from '../src/core/settings';
 import {search} from '../src/core/router';
 import {journeyFor} from '../src/core/journey';
@@ -12,15 +12,15 @@ test('mapped access follows a detour and never crosses a nearby disconnected com
  const graph=graphFromTiles([tile,tile],stops);assert.equal(graph.segments.length,4);
  const r=routeOrigin(graph,[59,18],300);assert.equal(r.walks.length,1);assert.equal(r.walks[0].seconds,170);assert.equal(r.walks[0].to,0);assert.equal(r.walks[0].path.length,4);
  assert.throws(()=>routeOrigin(graph,[59.02,18],1800),/Ingen kartlagd/);
- assert.throws(()=>routeOrigin(graph,[59,18],100),/Inga hållplatser/);
+ assert.deepEqual(routeOrigin(graph,[59,18],100).walks,[]);
 });
 test('mid-edge origin respects one-way walking and never creates a reverse edge',()=>{
  const t:FootpathTile={...tile,edges:[[0,1,57,43,1]],stops:[[0,'0',0,0,59,18],[1,'1',0,0,59,18.001]]};
  const r=routeOrigin(graphFromTiles([t],stops),[59,18.0005],100);assert.deepEqual(r.walks.map(w=>w.to),[1]);assert.equal(r.walks[0].seconds,22);
 });
 test('stale coordinates and retired endpoints cannot become access stops',()=>{
- assert.throws(()=>routeOrigin(graphFromTiles([tile],stops.map(s=>({...s,lat:58}))),[59,18],300),/Inga hållplatser/);
- assert.throws(()=>routeOrigin(graphFromTiles([tile],stops.map(s=>({...s,retired:true}))),[59,18],300),/Inga hållplatser/);
+ assert.deepEqual(routeOrigin(graphFromTiles([tile],stops.map(s=>({...s,lat:58}))),[59,18],300).walks,[]);
+ assert.deepEqual(routeOrigin(graphFromTiles([tile],stops.map(s=>({...s,retired:true}))),[59,18],300).walks,[]);
 });
 test('tile selection covers boundary crossings without loading unrelated tiles',()=>{
  const a={url:'/data/a.bin',sha256:'a',bytes:1},b={...a,url:'/data/b.bin'},m={footpaths:{format:'sliso-footpaths-v1',tileDegrees:.05,index:{'1180_360':a,'1179_359':b,'1300_400':a}}} as unknown as Manifest;
