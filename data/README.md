@@ -216,13 +216,31 @@ SHA-256 hashes, decompresses them and runs bounded Dijkstra in the routing worke
 The chosen origin is projected onto a mapped edge within 25 metres; the displayed
 start pin moves to that path and the UI reports the snap distance. This is a change
 of starting position, not a simulated off-network walking link. A point without a
-nearby mapped path or a reachable bound stop produces an explicit error. Routes
+nearby mapped path produces an explicit error. A mapped point with no reachable
+bound stop remains valid for direct walking journeys; it has no transit access. Routes
 respect walking direction and retain their physical geometry for the itinerary.
 Initial access counts toward journey time, the continuous walking limit and first
 boarding feasibility. The existing route scanner, transfer closure and stop-based
-contours then operate with those access states. No new contour from the arbitrary
-origin itself is generated; contours still start at reached stops with the walking
-budget reduced by access time. Missing OSM links can still hide possible journeys.
+contours then operate with those access states. For point origins, the routing
+worker also retains bounded directed walking times on mapped edges. The map
+interpolates these into filled local walking-time areas, comparable in style
+to the published Valhalla stop contours, and merges the earliest time with
+the existing transit contour at each display pixel. The interpolation reaches
+at most 120 metres perpendicular to a *reachable* mapped pedestrian edge,
+charges additional walking time for that distance, and never extends along
+a forbidden one-way edge. Nearby mapped streets therefore form coherent
+filled areas instead of thin route strokes, without a convex hull or an
+invented long-distance link. Direct walking does not require any reachable
+stop.
+
+**As with the precomputed contours, the filled area is only a visualization.**
+The 120-metre interpolation does not establish public access or a valid
+off-network route. Existing water masking removes known water pixels, but
+roads on opposite banks of a narrow waterway can still cause approximate
+land coverage; unmapped barriers and missing OSM links can also affect it.
+For exact directions, point-to-point journeys continue to require a real
+mapped, directionally traversable footpath. The walking area respects the
+same 30-minute walking limit as the point journey planner.
 
 Files have a `.bin` extension and contain deterministic gzip-compressed UTF-8 JSON
 with `schema: 1`, node rows `[id,latE7,lonE7]`, edge rows

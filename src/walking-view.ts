@@ -6,7 +6,7 @@ import {padBounds,containsBounds,worldProject,worldUnproject,distance,lngLat} fr
 import {useContourOverview} from './core/contour-view';
 import { walkingMinutes } from './core/walking';
 import { bandLimits, type RasterGrid } from './core/bands';
-import type { Manifest, SearchResult, Settings, Stop } from './core/types';
+import type { ContourFiles, Manifest, SearchResult, Settings, Stop } from './core/types';
 
 
 export class WalkingView {
@@ -52,17 +52,19 @@ export class WalkingView {
       this.reverse=new ReverseWalkingView(this.map,this.status,this.progress);
       this.reverse.setData(result,settings,manifest,stops);return;
     }
-    if(!areas){this.status('Gångområden saknas i detta dataset.');return;}
+    const direct=result.directWalking;
+    if(!areas&&!direct){this.status('Gångområden saknas i detta dataset.');return;}
     const preparation=profileStart();
     const available=walkingMinutes(result.walkSources,settings.maxMinutes*60,settings.walkMinutes*60);
     const positions=new Map<number,number[]>(),fullDeliveries=new Map<number,number>();
     for(const index of available.keys()){
-      const id=stops[index].id,file=areas.index[id],source=areas.sources?.[id]??file;
+      const id=stops[index].id,file=areas?.index[id];
       if(file!==undefined){
+        const source=areas?.sources?.[id]??file;
         positions.set(source,[...(positions.get(source)??[]),index]);fullDeliveries.set(source,file);
       }
     }
-    if(!positions.size){this.status('Inga gångområden finns för de nådda lägena. Gångtäckningen är ofullständig.');return;}
+    if(!positions.size&&!direct){this.status('Inga gångområden finns för de nådda lägena. Gångtäckningen är ofullständig.');return;}
     const selection=()=>{
       const bounds=this.map.getBounds(),d=(settings.walkMinutes*80+50)/111320;
       const lon=d/Math.max(.1,Math.cos(this.map.getCenter().lat*Math.PI/180));
@@ -71,9 +73,10 @@ export class WalkingView {
     };
     const needsOverview=(selected:Set<number>)=>{
       const files=new Set([...selected].map(source=>fullDeliveries.get(source)!));
-      return !!areas.overview&&useContourOverview(this.map.getZoom()+1,files.size,[...files].reduce((n,file)=>n+areas.files[file].bytes,0));
+      return !!areas?.overview&&useContourOverview(this.map.getZoom()+1,files.size,[...files].reduce((n,file)=>n+areas!.files[file].bytes,0));
     };
-    const overview=needsOverview(selection()),delivery=overview?areas.overview!:areas;
+    const overview=needsOverview(selection());
+    const delivery:ContourFiles=overview?areas!.overview!:(areas??{index:{},files:[]});
     if(overview){
       this.overviewNote=document.createElement('div');this.overviewNote.className='walking-overview-note';
       this.overviewNote.textContent='Översikt · zooma in för detaljer';this.overviewNote.setAttribute('aria-hidden','true');
@@ -93,7 +96,7 @@ export class WalkingView {
     const requests=new Map<number,AbortController>(),failed=new Set<number>();
     let selected=new Set<number>();
     let wanted=new Set<number>(),queue:number[]=[],profileVersion=0,view=0,busy=false,pending=false,mergeError=false;
-    let generation=0,nextToken=0;
+    let generation=0,nextToken=0,sentDirectGeneration=-1;
     const loading=new Map<number,{resolve:()=>void;reject:()=>void}>();
     const load=(file:number,signal:AbortSignal)=>new Promise<void>((resolve,reject)=>{
       const token=nextToken++;
@@ -117,10 +120,10 @@ export class WalkingView {
       this.progress?.(done,wanted.size+((busy||pending)&&!mergeError?1:0),failed.size+(mergeError?1:0));
       if(done<wanted.size)this.status(`${overview?'Översikt · ':''}Laddar och visar gångområden: ${done} av ${wanted.size} (${Math.floor(done/wanted.size*100)} %) i kartvyn${failed.size?` · ${failed.size} kunde inte laddas`:''}…`);
       else if(mergeError)this.status('Gångområden kunde inte sammanfogas. Hållplatsernas restider visas fortfarande. Sök igen för att försöka på nytt.');
-      else if(!wanted.size)this.status('Inga gångområden i denna kartvy. Flytta kartan till nådda hållplatser.');
+      else if(!wanted.size&&!direct)this.status('Inga gångområden i denna kartvy. Flytta kartan till nådda hållplatser.');
       else if(busy||pending)this.status(overview?'Sammanfogar översikt över gångområden…':'Sammanfogar restidsband i kartvyn…');
       else {
-        this.status(failed.size?`Gångområden visas delvis · ${failed.size} underlag kunde inte laddas. Sök igen för att försöka på nytt.`:overview?'Översiktliga gångområden · avrundade gångtider i femminuterssteg. Zooma in för fullständig detalj. Täckningen är ofullständig.':'Ungefärliga gångområden · ofullständig täckning. En färgad yta garanterar inte tillträde överallt.');
+        this.status(failed.size?`Gångområden visas delvis · ${failed.size} underlag kunde inte laddas. Sök igen för att försöka på nytt.`:!wanted.size&&direct?'Direkta gångvägar från kartpunkten · ungefärlig visningsbredd.':overview?'Översiktliga gångområden · avrundade gångtider i femminuterssteg. Zooma in för fullständig detalj. Täckningen är ofullständig.':'Ungefärliga gångområden och gångvägar · ofullständig täckning. En färgad yta garanterar inte tillträde överallt.');
         this.ready();
       }
     };
@@ -133,7 +136,7 @@ export class WalkingView {
       const partial=this.cutoff%10!==0&&this.cutoff!==settings.maxMinutes;
       const limits=known?(partial&&!this.workerCutoffs.has(this.cutoff)?[this.cutoff]:[]):[...new Set([...standard,this.cutoff])].sort((a,b)=>a-b);
       const bands=limits.map(minutes=>({minutes,allowances:[...budget(minutes)].flatMap(([index,allowance])=>{
-        const id=stops[index].id,file=delivery.index[id];return selected.has(areas.sources?.[id]??areas.index[id])&&wanted.has(file)&&this.profiles.has(file)?[[id,allowance] as [string,number]]:[];
+        const id=stops[index].id,file=delivery.index[id];return file!==undefined&&selected.has(areas?.sources?.[id]??file)&&wanted.has(file)&&this.profiles.has(file)?[[id,allowance] as [string,number]]:[];
       })}));
       // Profile deliveries may arrive during an animated zoom, before zoomend
       // advances the viewport generation. Keep its raster grid at its own zoom.
@@ -142,7 +145,11 @@ export class WalkingView {
       const grid:RasterGrid={width:Math.max(1,Math.ceil(w*scale)),height:Math.max(1,Math.ceil(h*scale)),bounds:[clip.getWest(),clip.getSouth(),clip.getEast(),clip.getNorth()]};
       profileEnd('main.budgets',started,{files:this.profiles.size,wanted:wanted.size});
       const post=profileStart();
-      merger.postMessage({type:'render',version,view,generation,cutoff:this.cutoff,maxMinutes:settings.maxMinutes,bands,grid,overview});profileEnd('main.post',post);progress();
+      // Only clone the potentially large graph segment payload once per viewport.
+      // Cutoff updates reuse the same directed walking field in the worker.
+      const includeDirect=sentDirectGeneration!==generation;
+      merger.postMessage({type:'render',version,view,generation,cutoff:this.cutoff,maxMinutes:settings.maxMinutes,bands,grid,overview,direct:includeDirect?direct:undefined});
+      sentDirectGeneration=generation;profileEnd('main.post',post);progress();
     };
     this.schedule=()=>{
       pending=true;
@@ -229,5 +236,8 @@ export class WalkingView {
     for(const type of ['moveend','zoomend','resize'] as const)this.map.on(type,updateView);
     controller.signal.addEventListener('abort',()=>{for(const type of ['moveend','zoomend','resize'] as const)this.map.off(type,updateView);for(const request of requests.values())request.abort();},{once:true});
     updateView();
+    // An origin can be walk-only: with no contour files, there is no file
+    // delivery to trigger the first render.
+    if(direct)this.schedule?.();
   }
 }

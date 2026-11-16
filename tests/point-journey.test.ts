@@ -40,7 +40,7 @@ test('nearby point-to-point walks do not detour via a stop, including mid-edge o
  const origin={stop:n.stops.length,lat:59,lon:18.002,anchor:{from:0,to:1,t:.2}};
  const access=routeDestinationAccess(graph,[59,18.003],300,origin),walk=access.walks.find(w=>w.to===n.stops.length)!;
  assert.ok(walk);assert.ok(walk.seconds>=43&&walk.seconds<=44);assert.deepEqual(walk.path,[[59,18.002],[59,18.003]]);
- assert.throws(()=>routeDestinationAccess(graph,[59,18.001],300,origin),/Inga hållplatser/);
+ assert.equal(routeDestinationAccess(graph,[59,18.001],300,origin).walks.some(w=>w.to===n.stops.length),false);
  const s={...defaults(n.stops[0]),origin:'point' as const,stop:'@point',lat:origin.lat,lon:origin.lon,date:'2026-10-23',time:'08:00',walkMinutes:5};
  const r=search(n,s,{access:{...origin,snapMetres:0,walks:[{to:1,seconds:344,metres:456,path:[[59,18.002],[59,18.01]]}]},destinationJourneys:true});
  const point=choosePointJourney(r,s,n.stops,access)!;assert.equal(point.value.seconds,walk.seconds);assert.deepEqual(point.legs.map(l=>l.kind),['walk']);assert.equal(point.legs[0].from,n.stops.length);

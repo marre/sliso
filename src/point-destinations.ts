@@ -74,7 +74,11 @@ export class PointDestinations {
   if(!manifest.footpaths||!result.destinationSources)return;
   this.worker=new Worker(new URL('./destination-worker.ts',import.meta.url),{type:'module'});
   this.worker.onerror=()=>{this.pinPending=false;this.status.textContent='Gångvägen till punkten kunde inte beräknas. Sök igen för att försöka på nytt.';this.status.hidden=false;this.worker?.terminate();this.worker=undefined;};
-  this.worker.postMessage({type:'configure',context:{manifest,settings,stops,result:{...result,values:[],routes:[],walkSources:[]}}});
+  // The destination worker needs journeys and their source labels, not the
+  // potentially large direct-walking overlay already owned by the band worker.
+  const compact={...result,values:[],routes:[],walkSources:[]};
+  delete compact.directWalking;
+  this.worker.postMessage({type:'configure',context:{manifest,settings,stops,result:compact}});
  }
  consumesOriginClick(){return this.inspected;}
  pause(){this.cancel();}
