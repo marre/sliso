@@ -123,7 +123,7 @@ export class WalkingView {
       else if(!wanted.size&&!direct)this.status('Inga gångområden i denna kartvy. Flytta kartan till nådda hållplatser.');
       else if(busy||pending)this.status(overview?'Sammanfogar översikt över gångområden…':'Sammanfogar restidsband i kartvyn…');
       else {
-        this.status(failed.size?`Gångområden visas delvis · ${failed.size} underlag kunde inte laddas. Sök igen för att försöka på nytt.`:!wanted.size&&direct?'Direkta gångvägar från kartpunkten · ungefärlig visningsbredd.':'Ungefärliga gångområden och gångvägar · ofullständig täckning. En färgad yta garanterar inte tillträde överallt.');
+        this.status(failed.size?`Gångområden visas delvis · ${failed.size} underlag kunde inte laddas. Sök igen för att försöka på nytt.`:!wanted.size&&direct?'Direkta gångvägar från kartpunkten · ungefärlig visningsbredd.':overview?'Översiktliga gångområden · avrundade gångtider i femminuterssteg. Zooma in för fullständig detalj. Täckningen är ofullständig.':'Ungefärliga gångområden och gångvägar · ofullständig täckning. En färgad yta garanterar inte tillträde överallt.');
         this.ready();
       }
     };

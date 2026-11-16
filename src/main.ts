@@ -175,7 +175,7 @@ function renderResults(r: SearchResult,s: Settings) {
     if(value)marker.setStyle({color:'#fff',fillColor:colorFor(value.seconds,s.maxMinutes),fillOpacity:1,weight:2,radius:7});
   });
   const count=r.values.filter((value,i)=>value&&i!==selected&&isMapStop(stops[i])).length;
-  status(exitGap ? exitWarning : count ? `Färdigt. ${count} hållplatslägen ${s.direction==='arrive'?'kan nå målet om du startar högst':'nås på högst'} ${s.maxMinutes} minuter${s.direction==='arrive'?' före din ankomsttid':''}. Beräkning: ${Math.round(r.elapsed)} ms.` : 'Inga andra hållplatslägen nås inom gränserna. Det kan saknas gånganslutningar i underlaget.');
+  status(exitGap ? exitWarning : count ? `Färdigt. ${count} hållplatslägen ${s.direction==='arrive'?'kan nå målet om du startar högst':'nås på högst'} ${s.maxMinutes} minuter${s.direction==='arrive'?' före din ankomsttid':''}. Beräkning: ${Math.round(r.elapsed)} ms.` : r.origin ? 'Färdigt. Inga hållplatser nås inom gränserna. Direkta gångvägar från kartpunkten visas om de finns i gångnätet.' : 'Inga andra hållplatslägen nås inom gränserna. Det kan saknas gånganslutningar i underlaget.');
   if (mobileLayout.matches) setMobileSearch(exitGap);
   $('#fit').setAttribute('title','Visa hela resultatet');$('#fit').setAttribute('aria-label','Visa hela resultatet');
 }
@@ -330,9 +330,16 @@ function constrainMapToStops() {
   map.on('resize',updateMapMinZoom);
 }
 function fitCurrentStops() {
-  const visible=stops.filter((stop,i)=>isMapStop(stop)&&(previewActive?previewValues[i]:!result||(result.values[i]&&result.values[i]!.seconds<=usedSettings!.maxMinutes*60)));if(!visible.length)return;
+  const visible=stops.filter((stop,i)=>isMapStop(stop)&&(previewActive?previewValues[i]:!result||(result.values[i]&&result.values[i]!.seconds<=usedSettings!.maxMinutes*60)));
+  const origin=result?.origin??pointOrigin;
+  if(!visible.length&&!origin)return;
   map.resize();updateMapMinZoom();
-  const bounds=boundsOf(visible.map(s=>[s.lat,s.lon]));if(pointOrigin)bounds.extend(lngLat(pointOrigin));const walkingBounds=walkingView.bounds();if(walkingBounds)bounds.extend(walkingBounds.getSouthWest()).extend(walkingBounds.getNorthEast());
+  const bounds=visible.length?boundsOf(visible.map(s=>[s.lat,s.lon])):(()=>{
+    const radius=Math.min(30,usedSettings?.walkMinutes??15)*80/111195;
+    const longitude=radius/Math.max(.1,Math.cos(origin!.lat*Math.PI/180));
+    return new LngLatBounds([origin!.lon-longitude,origin!.lat-radius],[origin!.lon+longitude,origin!.lat+radius]);
+  })();
+  if(origin)bounds.extend(lngLat(origin));const walkingBounds=walkingView.bounds();if(walkingBounds)bounds.extend(walkingBounds.getSouthWest()).extend(walkingBounds.getNorthEast());
   map.fitBounds(bounds,{duration:0,maxZoom:13,...mapFitPadding()});
 }
 $('#fit').onclick=fitCurrentStops;
