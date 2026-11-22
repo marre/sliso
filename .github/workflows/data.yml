@@ -143,26 +143,57 @@ jobs:
         run: |
           echo '::error::prepare_water requires prepare_walking=true and inventory_only=false'
           exit 1
-      - name: Install water extraction tools
-        if: steps.walking.outputs.water == 'true' && steps.walking.outputs.rebuild == 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y osmium-tool gdal-bin
       - name: Rebuild optional walking distances and network areas
+        id: walking-build
         if: steps.walking.outputs.rebuild == 'true'
+        env:
+          EVENT: ${{ github.event_name }}
+          WATER: ${{ steps.walking.outputs.water }}
         run: |
-          rm -rf .data-build/prepared-walking
-          python -m venv /tmp/sliso-walking-venv
-          /tmp/sliso-walking-venv/bin/pip install -r scripts/requirements-walking.txt
-          walking_args=(--current-osm)
-          if test "${{ steps.walking.outputs.water }}" = 'true'; then
-            /tmp/sliso-walking-venv/bin/pip install 'shapely>=2,<3'
-            walking_args+=(--water-output .data-build/prepared-walking/water-tiles)
+          # Never delete the last verified cache until a complete replacement exists.
+          # The nightly traffic release must not depend on an optional upstream OSM refresh.
+          next=.data-build/prepared-walking-next
+          reusable=false
+          if test -f .data-build/prepared-walking/.complete && test -f .data-build/prepared-walking/walks.json; then
+            reusable=true
           fi
-          /tmp/sliso-walking-venv/bin/python scripts/prepare_walking.py --gtfs .data-build/sl.zip --output .data-build/prepared-walking "${walking_args[@]}"
-          touch .data-build/prepared-walking/.complete
+          if test "$WATER" = true && ! test -f .data-build/prepared-walking/water-bitmap/index.json; then
+            reusable=false
+          fi
+          rm -rf "$next"
+          build_walking() {
+            python -m venv /tmp/sliso-walking-venv || return 1
+            /tmp/sliso-walking-venv/bin/pip install -r scripts/requirements-walking.txt || return 1
+            walking_args=(--current-osm)
+            if test "$WATER" = true; then
+              sudo apt-get update || return 1
+              sudo apt-get install -y osmium-tool gdal-bin || return 1
+              /tmp/sliso-walking-venv/bin/pip install 'shapely>=2,<3' || return 1
+              walking_args+=(--water-output "$next/water-tiles")
+            fi
+            /tmp/sliso-walking-venv/bin/python scripts/prepare_walking.py --gtfs .data-build/sl.zip --output "$next" "${walking_args[@]}" || return 1
+            test -f "$next/walks.json" || return 1
+            if test "$WATER" = true; then
+              test -f "$next/water-bitmap/index.json" || return 1
+            fi
+          }
+          if build_walking; then
+            touch "$next/.complete"
+            rm -rf .data-build/prepared-walking
+            mv "$next" .data-build/prepared-walking
+            echo 'updated=true' >> "$GITHUB_OUTPUT"
+          else
+            rm -rf "$next"
+            if test "$EVENT" = schedule && test "$reusable" = true; then
+              echo '::warning::Weekly OSM rebuild failed. Reusing the last verified walking data so the nightly SL traffic refresh can still publish.'
+              echo 'updated=false' >> "$GITHUB_OUTPUT"
+            else
+              echo '::error::Walking rebuild failed and no compatible verified cache is available (or a manual rebuild was requested).'
+              exit 1
+            fi
+          fi
       - name: Cache completed walking inputs for nightly reuse
-        if: steps.walking.outputs.rebuild == 'true'
+        if: steps.walking-build.outputs.updated == 'true'
         uses: actions/cache/save@v4
         with:
           path: .data-build/prepared-walking
@@ -171,7 +202,7 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || !inputs.inventory_only
         run: python scripts/refresh_walking.py --root .data-build/prepared-walking --gtfs .data-build/sl.zip
       - name: Save OSM source provenance
-        if: steps.walking.outputs.rebuild == 'true'
+        if: steps.walking-build.outputs.updated == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sliso-walking-osm-source
@@ -179,7 +210,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Save generated water tiles for validation
-        if: steps.walking.outputs.water == 'true' && steps.walking.outputs.rebuild == 'true'
+        if: steps.walking.outputs.water == 'true' && steps.walking-build.outputs.updated == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sliso-water-tiles
