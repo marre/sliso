@@ -91,6 +91,25 @@ class CurrentOSMTest(unittest.TestCase):
             self.assertFalse(list(Path(temp).glob('*.osm.pbf')))
             self.assertFalse((Path(temp)/'current-source.json').exists())
 
+    def test_total_download_deadline_limits_all_urls_and_retries(self):
+        payload=b'expected OSM'
+        md5=hashlib.md5(payload).hexdigest()
+        dated='https://download.geofabrik.de/europe/sweden-261122.osm.pbf'
+        elapsed=[1000]
+        calls=[]
+        def download(args, **kwargs):
+            calls.append((args[-1],int(args[args.index('--max-time')+1])))
+            elapsed[0]+=180
+            return subprocess.CompletedProcess(args,28)
+        with tempfile.TemporaryDirectory() as temp:
+            with patch('urllib.request.urlopen',return_value=Response((md5+'  sweden.osm.pbf\\n').encode(),dated+'.md5')):
+                with patch('prepare_walking.time.monotonic',side_effect=lambda: elapsed[0]):
+                    with patch('subprocess.run',side_effect=download):
+                        with self.assertRaisesRegex(RuntimeError,'verified current OSM'):
+                            fetch_current_osm(temp)
+        self.assertEqual(calls,[(dated,180)]*3+[(URL,60)])
+        self.assertLessEqual(sum(seconds for _,seconds in calls),600)
+
     def test_rejects_bad_sidecar(self):
         with tempfile.TemporaryDirectory() as temp:
             with patch('urllib.request.urlopen',return_value=Response(b'invalid','https://download.geofabrik.de/europe/sweden-261027.osm.pbf.md5')):
