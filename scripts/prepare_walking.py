@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 import tempfile
 from pathlib import Path
 
@@ -69,24 +70,43 @@ def fetch_current_osm(cache, *, latest='https://download.geofabrik.de/europe/swe
         if not path.is_file(): return False
         with path.open('rb') as stream:
             return hashlib.file_digest(stream,'md5').hexdigest()==md5
+    used_source = source
     if not matches(target):
         target.unlink(missing_ok=True)
         part=cache/(md5+'.part')
-        for attempt in range(3):
-            result=subprocess.run(['curl','--fail','--location','--show-error',
-                '--connect-timeout','30','--max-time','1800','--continue-at','-',
-                '--output',str(part),source],check=False)
-            if matches(part):
-                part.replace(target)
+        # The checksum sidecar and its dated PBF are not published atomically.
+        # A dated URL can briefly return 404; try the latest alias as well,
+        # but accept bytes ONLY when they match the original sidecar checksum.
+        # A single budget covers BOTH URLs and all retries. This must be much
+        # shorter than the Actions job timeout so scheduled fallback can run.
+        deadline=time.monotonic()+600
+        candidates=[source] if source==latest else [source,latest]
+        for candidate in candidates:
+            for attempt in range(1,4):
+                remaining=int(deadline-time.monotonic())
+                if remaining<=0:
+                    break
+                print(f'Fetching verified Geofabrik OSM: {candidate} (attempt {attempt}/3, {remaining}s left)',flush=True)
+                result=subprocess.run(['curl','--fail','--location','--show-error',
+                    '--connect-timeout','20','--max-time',str(min(180,remaining)),
+                    '--continue-at','-', '--user-agent','sliso-walking-build/1',
+                    '--output',str(part),candidate],check=False)
+                if matches(part):
+                    part.replace(target)
+                    used_source=candidate
+                    break
+                if result.returncode==0:
+                    part.unlink(missing_ok=True)
+                    raise ValueError('Geofabrik snapshot changed or checksum mismatch')
+                if result.returncode in (22,33):
+                    part.unlink(missing_ok=True)
+            if matches(target):
                 break
-            if result.returncode==0:
-                part.unlink(missing_ok=True)
-                raise ValueError('Geofabrik snapshot changed or checksum mismatch')
-            if result.returncode==33:part.unlink(missing_ok=True)
-        else: raise RuntimeError('Could not download verified current OSM')
+        else:
+            raise RuntimeError('Could not download verified current OSM from dated snapshot or latest alias')
     with target.open('rb') as stream:
         sha256=hashlib.file_digest(stream,'sha256').hexdigest()
-    provenance={'source':source,'md5':md5,'sha256':sha256,'bytes':target.stat().st_size,'license':'ODbL-1.0'}
+    provenance={'source':used_source,'md5':md5,'sha256':sha256,'bytes':target.stat().st_size,'license':'ODbL-1.0'}
     (cache/'current-source.json').write_text(json.dumps(provenance,indent=2)+'\n')
     print('Verified current OSM:',json.dumps(provenance),flush=True)
     return target
