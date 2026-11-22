@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 import tempfile
 from pathlib import Path
 
@@ -76,13 +77,19 @@ def fetch_current_osm(cache, *, latest='https://download.geofabrik.de/europe/swe
         # The checksum sidecar and its dated PBF are not published atomically.
         # A dated URL can briefly return 404; try the latest alias as well,
         # but accept bytes ONLY when they match the original sidecar checksum.
+        # A single budget covers BOTH URLs and all retries. This must be much
+        # shorter than the Actions job timeout so scheduled fallback can run.
+        deadline=time.monotonic()+600
         candidates=[source] if source==latest else [source,latest]
         for candidate in candidates:
             for attempt in range(1,4):
-                print(f'Fetching verified Geofabrik OSM: {candidate} (attempt {attempt}/3)',flush=True)
+                remaining=int(deadline-time.monotonic())
+                if remaining<=0:
+                    break
+                print(f'Fetching verified Geofabrik OSM: {candidate} (attempt {attempt}/3, {remaining}s left)',flush=True)
                 result=subprocess.run(['curl','--fail','--location','--show-error',
-                    '--connect-timeout','30','--max-time','1800','--continue-at','-',
-                    '--user-agent','sliso-walking-build/1',
+                    '--connect-timeout','20','--max-time',str(min(180,remaining)),
+                    '--continue-at','-', '--user-agent','sliso-walking-build/1',
                     '--output',str(part),candidate],check=False)
                 if matches(part):
                     part.replace(target)
