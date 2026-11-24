@@ -119,3 +119,37 @@ version stays unchanged. It writes a new immutable version and retains the old
 version for open clients. Package and publish it with `release_data.py` as usual;
 there is no Trafiklab request or OSM rebuild. Before packing, retain only the
 immediately preceding release directory to stay within the static asset budget.
+
+## Trafikkatalog för externa klienter
+
+Det ordinarie nattliga GTFS-bygget publicerar även en kompakt, versionsbunden
+trafikkatalog. Ingen ny Trafiklab-hämtning, nyckel eller separat tidtabellskörning
+krävs. Katalogen omfattar alla återstående aktiva trafikdagar i källans kalender,
+inte bara sliso:s kortare sökperiod. Den innehåller inga avgångstider.
+
+1. Hämta `/data/manifest.json` och läs det valfria fältet `serviceCatalog`
+   (format `sliso-service-catalog-v1`, URL, SHA-256 och byteantal).
+2. Hämta JSON-filen via dess versionsbundna URL. Äldre dataset och demo saknar
+   fältet. Server-till-server-klienter kan cacha filen tills manifestet ändras.
+3. Katalogens `schema: 1`, `sourceVersion`, `validFrom` och `validTo` avser
+   GTFS-källan och de trafikdagar som representeras, inte routingens giltighet.
+   `routes` är en map från GTFS route_id till `line` (route_short_name),
+   `name` (route_long_name), numeriskt `routeType` och `agencyId`.
+   `areas` är en map från GTFS parent_station (eller stop_id om förälder saknas)
+   till namn, `stopPointIds` och unika `services` med `routeId` och
+   `destination`. Endast lägen med tillåten påstigning före turens sista stopp
+   ingår; samma regler för bokning som routingimporten. En destinationsskylt
+   hämtas från stop_headsign, annars trip_headsign, annars sista hållplatsens
+   områdesnamn. Katalogen bevarar olika route_id även vid samma linjenummer.
+4. För SL-formatet `9021001xxxxxx000` finns även `slStopAreaId` (lokalt
+   hållplatsområdes-ID som sträng). Det är **inte** ett SiteID. En klient som
+   använder SL Transport behöver sammanföra områden via `/sites?expand=true`
+   och vid behov exakta GTFS stop-point GID:n via `/stop-points`. Ingen
+   namnmatchning, gissning av SiteID eller klassificering av lokala
+   trafikslag görs här. Rå GTFS route_type bevaras; SL:s produktkategorier
+   och exakt live-destinationsmatchning behöver hanteras av konsumenten.
+
+Alla katalogfiler inkluderas i ordinarie release och verifieras med samma
+storleks- och SHA-256-kontroller som övriga tillgångar. Katalogen omfattar
+planerade, inte tillfälliga oplanerade, turer. Datumgränserna betyder inte att
+varje variant körs varje dag. Källa: Trafiklab / Samtrafiken / SL (CC0).

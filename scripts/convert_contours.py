@@ -52,6 +52,8 @@ def convert(root):
         for ref in refs:
             ref['url'] = '/data/' + version + '/' + ref['url']
         core = [migrated[k] for k in ('stops','walks','routes','transfers','trips')]
+        if 'serviceCatalog' in migrated:
+            core.append(migrated['serviceCatalog'])
         core += [r for entries in migrated['days'].values() for r in entries]
         for ref in core:
             source = root / ref['url'].removeprefix('/data/')

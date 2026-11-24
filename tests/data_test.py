@@ -87,6 +87,21 @@ class DataTests(unittest.TestCase):
             m=json.loads((out/'manifest.json').read_text())
             walks=json.loads((out/m['walks']['url'].removeprefix('/data/')).read_text())
             self.assertEqual(walks,[])
+    def test_service_catalog_is_published_and_verified(self):
+        from release_data import validate
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);feed,w=self.fixture(root);out=root/'out'
+            compile_feed(feed,w,out,date(2026,10,19))
+            manifest=validate(out)
+            ref=manifest['serviceCatalog']
+            path=out/ref['url'].removeprefix('/data/')
+            catalog=json.loads(path.read_text())
+            self.assertEqual(catalog['areas']['a']['services'],[dict(routeId='r',destination='Mål')])
+            self.assertNotIn('b',catalog['areas'])
+            path.write_text('{}')
+            with self.assertRaisesRegex(ValueError,'checksum'):
+                validate(out)
+
     def test_route_branding_metadata_survives_gtfs_import(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);feed,w=self.fixture(root);out=root/'out'

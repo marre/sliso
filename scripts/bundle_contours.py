@@ -37,6 +37,8 @@ def migrate(root):
         migrated['version'] = version
         migrated['walkingAreas'] = fields
         core = [migrated[k] for k in ('stops','walks','routes','transfers','trips')]
+        if 'serviceCatalog' in migrated:
+            core.append(migrated['serviceCatalog'])
         core += [r for entries in migrated['days'].values() for r in entries]
         if migrated.get('walkingClosure'):
             core.append(migrated['walkingClosure'])

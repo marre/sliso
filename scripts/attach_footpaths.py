@@ -23,6 +23,7 @@ def attach(root,tiles):
     version=('demo-' if source['demo'] else 'sl-')+hashlib.sha256(compact([old,paths])).hexdigest()[:20]
     migrated=copy.deepcopy(source);migrated['version']=version;migrated['footpaths']=paths
     refs=[migrated[k] for k in ('stops','walks','routes','transfers','trips')]
+    if 'serviceCatalog' in migrated:refs.append(migrated['serviceCatalog'])
     refs.extend(r for parts in migrated['days'].values() for r in parts)
     for layer in [migrated.get('walkingAreas',{}),migrated.get('walkingAreas',{}).get('overview',{})]:refs.extend(layer.get('files',[]))
     if migrated.get('walkingClosure'):refs.append(migrated['walkingClosure'])
