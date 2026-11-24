@@ -46,11 +46,8 @@ def validate(root):
         raise ValueError('A real schema-2 dataset is required for publication')
     refs = [manifest[k] for k in ('stops', 'walks', 'routes', 'transfers', 'trips')]
     refs += [ref for entries in manifest['days'].values() for ref in entries]
-    if 'serviceCatalog' in manifest:
-        catalog = manifest['serviceCatalog']
-        if catalog.get('format') != 'sliso-service-catalog-v1':
-            raise ValueError('Invalid service catalogue format')
-        refs.append(catalog)
+    from service_catalog import version_refs
+    refs += version_refs(root, manifest)
     paths=manifest.get('footpaths')
     if paths:
         if paths.get('format')!='sliso-footpaths-v1' or paths.get('tileDegrees')!=.05 or not isinstance(paths.get('index'),dict):raise ValueError('Invalid footpath metadata')

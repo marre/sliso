@@ -95,10 +95,18 @@ class DataTests(unittest.TestCase):
             manifest=validate(out)
             ref=manifest['serviceCatalog']
             path=out/ref['url'].removeprefix('/data/')
-            catalog=json.loads(path.read_text())
+            from service_catalog import partition_id, expose
+            index=json.loads(path.read_text())
+            shard=index['partitions'][str(partition_id('a',index['partitionCount']))]
+            shard_path=path.parent/shard['file']
+            catalog=json.loads(shard_path.read_text())
             self.assertEqual(catalog['areas']['a']['services'],[dict(routeId='r',destination='Mål')])
             self.assertNotIn('b',catalog['areas'])
-            path.write_text('{}')
+            expose(out)
+            public=out/'service-catalog'
+            self.assertEqual(json.loads((public/'manifest.json').read_text()),index)
+            self.assertEqual((public/shard['file']).read_bytes(),shard_path.read_bytes())
+            shard_path.write_text('{}')
             with self.assertRaisesRegex(ValueError,'checksum'):
                 validate(out)
 

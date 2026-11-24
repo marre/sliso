@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from service_catalog import build
+from service_catalog import build, partition, partition_id, INDEX_NAME
 from build_data import active_services
 
 
@@ -59,3 +59,32 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(result['routes']['r']['routeType'],109)
         self.assertEqual(result['routes']['other']['routeType'],700)
         self.assertEqual(result,build(stops,routes,trips,dict(reversed(list(times.items()))),services,date(2026,11,24),'v1'))
+
+
+    def test_partition_paths_are_stable_and_self_contained(self):
+        import json
+        import hashlib
+        area = '9021001001234000'
+        catalog = dict(schema=1, source='GTFS Regional SL', sourceVersion='old',
+                       validFrom='2026-11-24', validTo='2026-12-24',
+                       routes={'r':dict(line='27'), 'b':dict(line='1')},
+                       areas={area:dict(services=[dict(routeId='r',destination='Ormsta')]),
+                              'other':dict(services=[dict(routeId='b',destination='Other')])})
+        self.assertEqual(partition_id(area,64),18)
+        self.assertEqual(partition_id('other',64),
+                         int(hashlib.sha256(b'other').hexdigest()[:8],16)%64)
+        first=partition(catalog)
+        index=json.loads(first[INDEX_NAME])
+        self.assertEqual(len(index['partitions']),64)
+        ref=index['partitions']['18']
+        shard=json.loads(first[ref['file']])
+        self.assertEqual(shard['areas'][area]['services'][0]['destination'],'Ormsta')
+        self.assertEqual(shard['routes']['r']['line'],'27')
+        second=partition(dict(catalog,sourceVersion='new',validFrom='2026-11-25'))
+        self.assertNotEqual(first[INDEX_NAME],second[INDEX_NAME])
+        self.assertEqual({k:v for k,v in first.items() if k!=INDEX_NAME},
+                         {k:v for k,v in second.items() if k!=INDEX_NAME})
+        catalog['areas'][area]['services'][0]['destination']='Kårsta'
+        changed=json.loads(partition(catalog)[INDEX_NAME])
+        self.assertEqual([n for n in index['partitions']
+                          if index['partitions'][n]!=changed['partitions'][n]],['18'])

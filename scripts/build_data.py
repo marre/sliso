@@ -144,7 +144,13 @@ def publish(output, stops, routes, walks, transfers, trips, days, meta, report, 
             files['walking-closure.bin'], pairs = build_closure(stops, walks, meta['walkingMaxMinutes'], hashlib.sha256(walk_payload).hexdigest(), hashlib.sha256(files['stops.json']).hexdigest())
             report['walkingClosure'] = dict(pairs=pairs, bytes=len(files['walking-closure.bin']), witnessesVerified=True)
         if service_catalog is not None:
-            files['service-catalog.json'] = compact(service_catalog)
+            from service_catalog import partition, FORMAT as CATALOG_FORMAT, INDEX_NAME
+            catalog_files = partition(service_catalog)
+            files.update(catalog_files)
+            sizes = [len(raw) for name, raw in catalog_files.items() if name != INDEX_NAME]
+            report['serviceCatalog'] = dict(areas=len(service_catalog['areas']), routes=len(service_catalog['routes']),
+                                            partitions=len(sizes), bytes=sum(map(len, catalog_files.values())),
+                                            largestPartitionBytes=max(sizes))
         files.update(time_files)
         if areas: files.update(areas['files'])
         if water: files.update(water['files'])
@@ -166,7 +172,7 @@ def publish(output, stops, routes, walks, transfers, trips, days, meta, report, 
             staging.rename(dest)
         manifest = dict(schema=2, version=version, **meta, trips=refs['trips.json'], days={d:[{**refs[n],'from':a,'until':b} for n,a,b in parts] for d,parts in day_files.items()}, **{k: refs[k + '.json'] for k in ('stops','routes','walks','transfers')})
         if service_catalog is not None:
-            manifest['serviceCatalog'] = dict(**refs['service-catalog.json'], format='sliso-service-catalog-v1')
+            manifest['serviceCatalog'] = dict(**refs[INDEX_NAME], format=CATALOG_FORMAT)
         if has_closure: manifest['walkingClosure'] = dict(**refs['walking-closure.bin'], format=CLOSURE_FORMAT, maxMinutes=meta['walkingMaxMinutes'])
         if areas:
             from contour_bundles import manifest_fields
