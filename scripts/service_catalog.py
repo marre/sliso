@@ -18,7 +18,7 @@ def build(raw_stops, routes, trips, stop_times, services, begin, source_version)
     routes_by_id = {r['route_id']: r for r in routes}
     areas = {}
     used_routes = set()
-    used_dates = set()
+    used_services = set()
 
     def area_for(point_id):
         point = stops[point_id]
@@ -47,7 +47,7 @@ def build(raw_stops, routes, trips, stop_times, services, begin, source_version)
             entry['points'].add(point_id)
             entry['services'].add((route_id, destination))
             used_routes.add(route_id)
-            used_dates.update(active_dates)
+            used_services.add(trip['service_id'])
     if not areas:
         raise ValueError('No boardable services for traffic catalogue')
 
@@ -62,6 +62,7 @@ def build(raw_stops, routes, trips, stop_times, services, begin, source_version)
         if match:
             item['slStopAreaId'] = str(int(match[1]))
         result[area_id] = item
+    used_dates = [day for service in used_services for day in dates[service]]
     return dict(
         schema=1, source='GTFS Regional SL', sourceVersion=source_version,
         validFrom=min(used_dates).isoformat(), validTo=max(used_dates).isoformat(),
