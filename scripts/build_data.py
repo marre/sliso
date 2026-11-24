@@ -12,6 +12,7 @@ import re
 import shutil
 import struct
 import tempfile
+import time
 import zipfile
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
@@ -145,12 +146,14 @@ def publish(output, stops, routes, walks, transfers, trips, days, meta, report, 
             report['walkingClosure'] = dict(pairs=pairs, bytes=len(files['walking-closure.bin']), witnessesVerified=True)
         if service_catalog is not None:
             from service_catalog import partition, FORMAT as CATALOG_FORMAT, INDEX_NAME
+            partition_started = time.perf_counter()
             catalog_files = partition(service_catalog)
             files.update(catalog_files)
             sizes = [len(raw) for name, raw in catalog_files.items() if name != INDEX_NAME]
             report['serviceCatalog'] = dict(areas=len(service_catalog['areas']), routes=len(service_catalog['routes']),
                                             partitions=len(sizes), bytes=sum(map(len, catalog_files.values())),
-                                            largestPartitionBytes=max(sizes))
+                                            largestPartitionBytes=max(sizes),
+                                            partitionSeconds=round(time.perf_counter()-partition_started,3))
         files.update(time_files)
         if areas: files.update(areas['files'])
         if water: files.update(water['files'])
@@ -281,8 +284,10 @@ def compile_feed(feed, walking, output, start=None, scope=None, walking_areas=No
     first, last = min(active_days),max(active_days)
     begin = max(first,start or datetime.now(TZ).date())
     from service_catalog import build as build_catalog
+    catalog_started = time.perf_counter()
     catalog = build_catalog(raw_stops, routes_raw, trip_meta, raw_times, services,
                             begin, feed_info[0].get('feed_version','') if feed_info else '')
+    catalog_build_seconds = time.perf_counter() - catalog_started
     del raw_times
     with open(walking) as f:
         walk_meta = json.load(f)
@@ -401,6 +406,7 @@ def compile_feed(feed, walking, output, start=None, scope=None, walking_areas=No
     except ValueError: source_updated=None
     meta = dict(demo=False,sourceVersion=source_version,sourceUpdated=source_updated,updated=datetime.now(timezone.utc).isoformat(),validFrom=begin.isoformat(),validTo=(end-timedelta(days=1)).isoformat(),walkingMaxMinutes=walk_meta['maxMinutes'],walkingSpeedKmh=4.8,walkingVersion=walk_meta['version']+'+'+TRANSFER_POLICY,transferWalking=transfer_access,walkingCoverage={'totalStops':len(stops),'boundStops':len({s['id'] for s in walk_meta['stops'] if s['id'] in stop_ids and not s.get('binding','').startswith('assumed-')}),'pairs':len(walks),'reviewed':walk_meta.get('reviewed',False)},warnings=warnings,attribution=['Planerad trafik: Trafiklab / Samtrafiken / SL']+walk_meta.get('attribution',[]))
     report = dict(transferWalking=transfer_access,stops=len(stops),retiredPlatforms=sum(s.get('retired',False) for s in stops),routes=len(routes),routeInventory=routes,scope=scope_report,modes=dict(Counter(r['mode'] for r in routes)),transferRows=len(rules),expandedRules=len(expanded),walkingEdges=len(walks),excludedRestricted=excluded,stopsWithoutOutgoingWalk=gaps,stopTimeRows=time_rows,routesWithoutSupportedBoarding=unsupported_routes,review='Not manually verified. Complete docs/review-cases.csv before pilot.')
+    report['serviceCatalogBuildSeconds'] = round(catalog_build_seconds,3)
     if osm_source:
         source=json.loads(Path(osm_source).read_text())
         if not re.fullmatch(r'[0-9a-f]{64}',source.get('sha256','')) or not source['sha256'][:20] in walk_meta['version']:

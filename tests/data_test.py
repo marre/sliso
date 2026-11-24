@@ -88,7 +88,7 @@ class DataTests(unittest.TestCase):
             walks=json.loads((out/m['walks']['url'].removeprefix('/data/')).read_text())
             self.assertEqual(walks,[])
     def test_service_catalog_is_published_and_verified(self):
-        from release_data import validate
+        from release_data import validate, pack, install
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);feed,w=self.fixture(root);out=root/'out'
             compile_feed(feed,w,out,date(2026,10,19))
@@ -106,6 +106,17 @@ class DataTests(unittest.TestCase):
             public=out/'service-catalog'
             self.assertEqual(json.loads((public/'manifest.json').read_text()),index)
             self.assertEqual((public/shard['file']).read_bytes(),shard_path.read_bytes())
+            # Public aliases are regenerated from the pinned release, not
+            # included twice in its archive.
+            archive=root/'release.zip'
+            release=pack(out,archive,root/'release.json','marre/sliso')
+            with zipfile.ZipFile(archive) as z:
+                self.assertNotIn('service-catalog/manifest.json',z.namelist())
+            installed=root/'installed'
+            self.assertEqual(install(archive,release,installed),manifest)
+            expose(installed)
+            self.assertEqual((installed/'service-catalog'/shard['file']).read_bytes(),
+                             shard_path.read_bytes())
             shard_path.write_text('{}')
             with self.assertRaisesRegex(ValueError,'checksum'):
                 validate(out)

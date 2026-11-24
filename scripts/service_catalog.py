@@ -65,7 +65,7 @@ def build(raw_stops, routes, trips, stop_times, services, begin, source_version)
                               for r, d in sorted(entry['services'])])
         # SL stop-area GID (not SiteID). Preserve the full identifier and
         # exact stop-point GIDs even where this SL-specific format is absent.
-        match = re.fullmatch(r'9021001(\d{6})000', area_id)
+        match = re.fullmatch(r'9021001([0-9]{6})000', area_id)
         if match:
             item['slStopAreaId'] = str(int(match[1]))
         result[area_id] = item
@@ -91,7 +91,7 @@ PUBLIC_DIR = 'service-catalog'
 def partition_id(area_id, count):
     if type(count) is not int or not 1 <= count <= 256:
         raise ValueError('Invalid catalogue partition count')
-    match = re.fullmatch(r'9021001(\d{6})000', area_id)
+    match = re.fullmatch(r'9021001([0-9]{6})000', area_id)
     number = int(match[1]) if match else int.from_bytes(
         hashlib.sha256(area_id.encode('utf-8')).digest()[:4], 'big')
     return number % count
@@ -125,10 +125,12 @@ def partition(catalog, count=PARTITION_COUNT):
 
 
 def read_verified(path, ref):
-    if (path.is_symlink() or not path.is_file() or path.stat().st_size != ref['bytes']
-            or hashlib.sha256(path.read_bytes()).hexdigest() != ref['sha256']):
+    if path.is_symlink() or not path.is_file() or path.stat().st_size != ref['bytes']:
         raise ValueError('Service catalogue checksum/size mismatch: ' + str(path))
-    return path.read_bytes()
+    raw = path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != ref['sha256']:
+        raise ValueError('Service catalogue checksum/size mismatch: ' + str(path))
+    return raw
 
 
 def shard_refs(directory, index):
