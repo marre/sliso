@@ -12,6 +12,7 @@ import re
 import shutil
 import struct
 import tempfile
+import time
 import zipfile
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
@@ -114,7 +115,7 @@ def compact_walks(walks):
     return {'schema':1,'sources':sources,'edges':[[w['from'],w['to'],w['seconds'],w.get('metres'),ids[w['source']]] for w in walks]}
 
 
-def publish(output, stops, routes, walks, transfers, trips, days, meta, report, areas=None, water=None):
+def publish(output, stops, routes, walks, transfers, trips, days, meta, report, areas=None, water=None, service_catalog=None):
     if areas:
         from contour_bundles import bundle
         areas = bundle(areas, stops)
@@ -143,6 +144,16 @@ def publish(output, stops, routes, walks, transfers, trips, days, meta, report, 
         if has_closure:
             files['walking-closure.bin'], pairs = build_closure(stops, walks, meta['walkingMaxMinutes'], hashlib.sha256(walk_payload).hexdigest(), hashlib.sha256(files['stops.json']).hexdigest())
             report['walkingClosure'] = dict(pairs=pairs, bytes=len(files['walking-closure.bin']), witnessesVerified=True)
+        if service_catalog is not None:
+            from service_catalog import partition, FORMAT as CATALOG_FORMAT, INDEX_NAME
+            partition_started = time.perf_counter()
+            catalog_files = partition(service_catalog)
+            files.update(catalog_files)
+            sizes = [len(raw) for name, raw in catalog_files.items() if name != INDEX_NAME]
+            report['serviceCatalog'] = dict(areas=len(service_catalog['areas']), routes=len(service_catalog['routes']),
+                                            partitions=len(sizes), bytes=sum(map(len, catalog_files.values())),
+                                            largestPartitionBytes=max(sizes),
+                                            partitionSeconds=round(time.perf_counter()-partition_started,3))
         files.update(time_files)
         if areas: files.update(areas['files'])
         if water: files.update(water['files'])
@@ -163,6 +174,8 @@ def publish(output, stops, routes, walks, transfers, trips, days, meta, report, 
         if not dest.exists():
             staging.rename(dest)
         manifest = dict(schema=2, version=version, **meta, trips=refs['trips.json'], days={d:[{**refs[n],'from':a,'until':b} for n,a,b in parts] for d,parts in day_files.items()}, **{k: refs[k + '.json'] for k in ('stops','routes','walks','transfers')})
+        if service_catalog is not None:
+            manifest['serviceCatalog'] = dict(**refs[INDEX_NAME], format=CATALOG_FORMAT)
         if has_closure: manifest['walkingClosure'] = dict(**refs['walking-closure.bin'], format=CLOSURE_FORMAT, maxMinutes=meta['walkingMaxMinutes'])
         if areas:
             from contour_bundles import manifest_fields
@@ -214,7 +227,7 @@ def compile_feed(feed, walking, output, start=None, scope=None, walking_areas=No
                 if not st.get('arrival_time') or not st.get('departure_time'):
                     raise ValueError('Untimed stop requires explicit interpolation policy')
                 arr, dep = gtfs_seconds(st['arrival_time']), gtfs_seconds(st['departure_time'])
-                raw_times[st['trip_id']].append((st['stop_id'], arr, dep, int(st['stop_sequence']), boarding_flags(st,'pickup'), boarding_flags(st,'dropoff')))
+                raw_times[st['trip_id']].append((st['stop_id'], arr, dep, int(st['stop_sequence']), boarding_flags(st,'pickup'), boarding_flags(st,'dropoff'), st.get('stop_headsign') or ''))
                 used_stops.add(st['stop_id'])
                 types_by_stop[st['stop_id']].add(route_types[trip_meta[st['trip_id']]['route_id']])
                 headsign=st.get('stop_headsign') or trip_meta[st['trip_id']].get('trip_headsign')
@@ -257,12 +270,24 @@ def compile_feed(feed, walking, output, start=None, scope=None, walking_areas=No
             raise ValueError('Duplicate stop_sequence')
         prev = -1
         converted = []
-        for sid,arr,dep,seq,pick,drop in tt:
+        for sid,arr,dep,seq,pick,drop,_ in tt:
             if arr < prev or dep < arr:
                 raise ValueError('Non-monotonic trip ' + tid)
             prev = dep
             converted.append((stop_ids[sid],arr,dep,seq,pick,drop))
         trip_times[tid] = converted
+    used_services = {t['service_id'] for t in trip_meta.values()}
+    services = {d:ids & used_services for d,ids in active_services(calendar,exceptions).items()}
+    active_days = [d for d,ids in services.items() if ids]
+    if not active_days:
+        raise ValueError('No active services')
+    first, last = min(active_days),max(active_days)
+    begin = max(first,start or datetime.now(TZ).date())
+    from service_catalog import build as build_catalog
+    catalog_started = time.perf_counter()
+    catalog = build_catalog(raw_stops, routes_raw, trip_meta, raw_times, services,
+                            begin, feed_info[0].get('feed_version','') if feed_info else '')
+    catalog_build_seconds = time.perf_counter() - catalog_started
     del raw_times
     with open(walking) as f:
         walk_meta = json.load(f)
@@ -321,13 +346,7 @@ def compile_feed(feed, walking, output, start=None, scope=None, walking_areas=No
                         rule[dst] = r[src]
                 expanded.append(rule)
     # Rules reference GTFS base trip IDs, not a Cartesian product of service-day instances.
-    used_services = {t['service_id'] for t in trip_meta.values()}
-    services = {d:ids & used_services for d,ids in active_services(calendar,exceptions).items()}
-    active_days = [d for d,ids in services.items() if ids]
-    if not active_days:
-        raise ValueError('No active services')
-    first, last = min(active_days),max(active_days)
-    begin = max(first,start or datetime.now(TZ).date())
+
     end = min(last,begin+timedelta(days=8))
     if begin >= end:
         raise ValueError('Feed does not cover an upcoming search day plus following traffic day')
@@ -387,6 +406,7 @@ def compile_feed(feed, walking, output, start=None, scope=None, walking_areas=No
     except ValueError: source_updated=None
     meta = dict(demo=False,sourceVersion=source_version,sourceUpdated=source_updated,updated=datetime.now(timezone.utc).isoformat(),validFrom=begin.isoformat(),validTo=(end-timedelta(days=1)).isoformat(),walkingMaxMinutes=walk_meta['maxMinutes'],walkingSpeedKmh=4.8,walkingVersion=walk_meta['version']+'+'+TRANSFER_POLICY,transferWalking=transfer_access,walkingCoverage={'totalStops':len(stops),'boundStops':len({s['id'] for s in walk_meta['stops'] if s['id'] in stop_ids and not s.get('binding','').startswith('assumed-')}),'pairs':len(walks),'reviewed':walk_meta.get('reviewed',False)},warnings=warnings,attribution=['Planerad trafik: Trafiklab / Samtrafiken / SL']+walk_meta.get('attribution',[]))
     report = dict(transferWalking=transfer_access,stops=len(stops),retiredPlatforms=sum(s.get('retired',False) for s in stops),routes=len(routes),routeInventory=routes,scope=scope_report,modes=dict(Counter(r['mode'] for r in routes)),transferRows=len(rules),expandedRules=len(expanded),walkingEdges=len(walks),excludedRestricted=excluded,stopsWithoutOutgoingWalk=gaps,stopTimeRows=time_rows,routesWithoutSupportedBoarding=unsupported_routes,review='Not manually verified. Complete docs/review-cases.csv before pilot.')
+    report['serviceCatalogBuildSeconds'] = round(catalog_build_seconds,3)
     if osm_source:
         source=json.loads(Path(osm_source).read_text())
         if not re.fullmatch(r'[0-9a-f]{64}',source.get('sha256','')) or not source['sha256'][:20] in walk_meta['version']:
@@ -408,7 +428,7 @@ def compile_feed(feed, walking, output, start=None, scope=None, walking_areas=No
             if len(raw)!=512*512//8:raise ValueError('Invalid water bitmap tile size')
             water_files[name]=raw
         water=dict(files=water_files,tiles=tiles,tileDegrees=index['tileDegrees'],resolution=512)
-    publish(output,stops,routes,walks,expanded,trip_keys,days,meta,report,areas,water)
+    publish(output,stops,routes,walks,expanded,trip_keys,days,meta,report,areas,water,service_catalog=catalog)
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)

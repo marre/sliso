@@ -119,3 +119,59 @@ version stays unchanged. It writes a new immutable version and retains the old
 version for open clients. Package and publish it with `release_data.py` as usual;
 there is no Trafiklab request or OSM rebuild. Before packing, retain only the
 immediately preceding release directory to stay within the static asset budget.
+
+## Trafikkatalog för externa klienter
+
+Det ordinarie nattliga GTFS-bygget skapar en trafikkatalog för hela återstående
+GTFS-kalendern, utan avgångstider eller ytterligare Trafiklab-anrop. Katalogen
+publiceras som statiska filer, oberoende av routingens dagliga versions-ID.
+
+### Klientkontrakt
+
+1. Hämta `/data/service-catalog/manifest.json`. Den innehåller `schema: 1`,
+   `sourceVersion`, `validFrom`, `validTo`, `partitionCount` (64 i dag),
+   `partitionMethod` och `partitions` (map från partitionsnummer till
+   `file`, `sha256` och `bytes`). Äldre dataset och demo saknar katalogen.
+2. För algoritmen `sl-stop-area-modulo-or-sha256-u32be-v1`: använd hela
+   GTFS-hållplatsområdes-ID:t som sträng. Om det matchar
+   `^9021001([0-9]{6})000$`, tolka de sex fångade siffrorna som ett decimalt
+   heltal. Annars SHA-256-hasha ID:ts UTF-8-byte och tolka de fyra första
+   hashbyten som ett unsigned 32-bitars heltal i big-endian-ordning.
+   Beräkna heltalet modulo `partitionCount`. Exempel:
+   `9021001001234000` → 1234 → partition 18 vid 64 partitioner.
+   Okänd algoritm eller schema ska nekas, inte gissas.
+3. Hämta endast filen som manifestets `partitions[String(partition)]`
+   refererar till, relativt manifestets URL. Varje fil är självförsörjande:
+   `schema: 1`, `partition`, `areas` och `routes`. Filnamnet
+   `part-18-<sha256>.json` ändras endast när innehållet ändras. Datum och
+   källversion ligger endast i manifestet. Verifiera byteantal och SHA-256
+   vid behov. Om en gammal partition saknas efter en ny deployment, hämta
+   om manifestet och försök igen. Oförändrade partitioner kan cachas i ett år.
+4. `areas` mappar exakt GTFS parent_station (eller stop_id om förälder saknas)
+   till namn, `stopPointIds` och unika `services` med `routeId` och
+   `destination`. `routes` innehåller metadata för just partitionens linjer:
+   `line`, `name`, numeriskt `routeType` och `agencyId`. Endast lägen med
+   tillåten påstigning före turens sista stopp ingår; samma bokningsregler
+   som routingimporten. Destination hämtas från stop_headsign, annars
+   trip_headsign, annars sista hållplatsens områdesnamn. Samma linjenummer
+   kan representera flera route_id:n.
+5. För SL-formatet finns även `slStopAreaId` (lokalt hållplatsområdes-ID som
+   sträng, **inte** SiteID). Klienter som använder SL Transport behöver mappa
+   SiteID via `/sites?expand=true` och vid behov stop-point-ID:n via
+   `/stop-points`. Ingen namnmatchning eller gissning av SiteID görs här.
+   Rå GTFS route_type bevaras; SL:s produktkategorier och exakt matchning
+   mot realtidsdestinationer hanteras av konsumenten.
+
+### Bygg och distribution
+
+Den vanliga `/data/manifest.json` har ett valfritt `serviceCatalog`-fält
+(format `sliso-service-catalog-v2`) som pekar på katalogindexet i den
+immuterbara dataversionen. Alla partitioner ligger där i release-ZIP:en och
+valideras tillsammans med andra data. Vid `npm run build` återskapas den
+stabila publika katalogen från den pinnade releasen; routingklienten behöver
+inte hämta den. Partitioner från eventuellt bibehållna äldre dataset exponeras
+också. Byggrapporten visar antal områden, linjer, partitioner, totalt byteantal
+och största partition. Inga ytterligare Worker-endpoints, KV eller R2 behövs.
+
+Katalogen omfattar planerade, inte tillfälliga oplanerade turer. Datumgränserna
+innebär inte att varje variant körs varje dag. Källa: Trafiklab / Samtrafiken / SL (CC0).

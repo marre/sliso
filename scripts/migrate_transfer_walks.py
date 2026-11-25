@@ -35,6 +35,8 @@ def migrate(root):
     migrated['warnings']=[w for w in source['warnings'] if not w.startswith('Publicerade stationsbyten:') and not re.match(r'^\d+ hållplatslägen saknar utgående',w)]+[WARNING]
     if gaps:migrated['warnings'].append(f'{gaps} hållplatslägen saknar utgående gånganslutning i underlaget.')
     refs=[migrated[k] for k in ('stops','walks','routes','transfers','trips')]
+    from service_catalog import version_refs
+    refs.extend(version_refs(root, {**migrated, 'version': source['version']}))
     refs.extend(r for parts in migrated['days'].values() for r in parts)
     refs.extend(migrated.get('walkingAreas',{}).get('files',[]));refs.extend(migrated.get('walkingAreas',{}).get('overview',{}).get('files',[]))
     refs.extend(migrated.get('footpaths',{}).get('index',{}).values())

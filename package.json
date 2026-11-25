@@ -14,7 +14,7 @@
     "data:demo": "python scripts/demo.py",
     "data:build": "python scripts/build_data.py",
     "benchmark": "tsx scripts/benchmark.ts",
-    "prebuild": "python scripts/release_data.py fetch && python scripts/stop_service.py",
+    "prebuild": "python scripts/release_data.py fetch && python scripts/stop_service.py && python scripts/service_catalog.py",
     "data:pull": "python scripts/release_data.py fetch --force"
   },
   "devDependencies": {
